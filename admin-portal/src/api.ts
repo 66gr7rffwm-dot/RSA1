@@ -3,6 +3,11 @@ import axios from 'axios';
 // Use environment variable for API URL in production, or relative path in development
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+// Log API URL in development to help debug
+if (import.meta.env.DEV) {
+  console.log('API URL:', API_URL);
+}
+
 const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
@@ -24,10 +29,30 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Log full error for debugging
+    console.error('API Error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+      method: error.config?.method,
+      baseURL: error.config?.baseURL,
+      message: error.message,
+    });
+    
     // Handle network errors
     if (!error.response) {
       console.error('Network Error:', error.message);
-      return Promise.reject(new Error('Network error. Please check your connection.'));
+      return Promise.reject(new Error('Network error. Please check your connection and API URL.'));
+    }
+    
+    // Handle 405 Method Not Allowed
+    if (error.response?.status === 405) {
+      console.error('405 Method Not Allowed - Check API URL and endpoint:', {
+        url: error.config?.url,
+        fullURL: error.config?.baseURL + error.config?.url,
+        method: error.config?.method,
+      });
+      return Promise.reject(new Error('Method not allowed. Please check API configuration.'));
     }
     
     // Handle 401 unauthorized
