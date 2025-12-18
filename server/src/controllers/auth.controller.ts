@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { pool } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
 
@@ -112,14 +112,18 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
     }
 
     // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
+    const signOptions: SignOptions = {
+      expiresIn: (process.env.JWT_EXPIRE || '7d') as any,
+    };
     const token = jwt.sign(
       {
         userId: user.id,
         phoneNumber: user.phone_number,
         role: user.role,
       },
-      process.env.JWT_SECRET || '',
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      jwtSecret,
+      signOptions
     );
 
     // Check active subscription
@@ -211,14 +215,18 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
     const user = userResult.rows[0];
 
     // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
+    const signOptions: SignOptions = {
+      expiresIn: (process.env.JWT_EXPIRE || '7d') as any,
+    };
     const token = jwt.sign(
       {
         userId: user.id,
         phoneNumber: user.phone_number,
         role: user.role,
       },
-      process.env.JWT_SECRET || '',
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+      jwtSecret,
+      signOptions
     );
 
     res.status(200).json({

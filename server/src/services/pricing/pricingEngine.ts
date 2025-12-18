@@ -129,24 +129,30 @@ export class PricingEngine {
 
   /**
    * Calculate cost for a new passenger joining an existing trip
+   * Simplified version for estimation (assumes 1 passenger scenario)
    */
   calculatePassengerCostForBooking(
     totalTripCost: number,
-    currentPassengerCount: number,
-    newPassengerCount: number, // After adding this passenger
-    partialDistanceFactor: number
+    partialDistanceFactor: number,
+    currentPassengerCount?: number,
+    newPassengerCount?: number
   ): number {
-    if (newPassengerCount === 1) {
-      // First passenger: pays 50% of their portion
-      const driverContribution = totalTripCost * this.DRIVER_SHARE_FACTOR;
-      return (totalTripCost - driverContribution) * partialDistanceFactor;
-    } else if (newPassengerCount === 2 || newPassengerCount === 3) {
-      // Multiple passengers: split cost equally
-      // If this is the second passenger, recalculate for 2 passengers
-      // If this is the third passenger, recalculate for 3 passengers
-      return (totalTripCost * partialDistanceFactor) / newPassengerCount;
+    // If passenger counts are provided, use the full calculation
+    if (currentPassengerCount !== undefined && newPassengerCount !== undefined) {
+      if (newPassengerCount === 1) {
+        // First passenger: pays 50% of their portion
+        const driverContribution = totalTripCost * this.DRIVER_SHARE_FACTOR;
+        return (totalTripCost - driverContribution) * partialDistanceFactor;
+      } else if (newPassengerCount === 2 || newPassengerCount === 3) {
+        // Multiple passengers: split cost equally
+        return (totalTripCost * partialDistanceFactor) / newPassengerCount;
+      }
+      throw new Error('Invalid passenger count');
     }
-    throw new Error('Invalid passenger count');
+    
+    // Simplified estimation: assume single passenger scenario
+    const driverContribution = totalTripCost * this.DRIVER_SHARE_FACTOR;
+    return (totalTripCost - driverContribution) * partialDistanceFactor;
   }
 
   /**

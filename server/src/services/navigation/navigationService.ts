@@ -168,12 +168,15 @@ export class NavigationService {
    * Calculate partial journey distance factor
    */
   async calculatePartialDistanceFactor(
-    fullRouteDistance: number,
-    passengerPickup: Location,
-    passengerDropoff: Location,
     tripOrigin: Location,
-    tripDestination: Location
-  ): Promise<number> {
+    tripDestination: Location,
+    passengerPickup: Location,
+    passengerDropoff: Location
+  ): Promise<{ partialDistanceFactor: number; partialDistanceKm: number }> {
+    // Calculate full trip distance
+    const fullTripRoute = await this.calculateRoute(tripOrigin, tripDestination);
+    const fullTripDistance = fullTripRoute.distance;
+
     // Calculate passenger's actual travel distance
     const passengerRoute = await this.calculateRoute(passengerPickup, passengerDropoff);
     const passengerDistance = passengerRoute.distance;
@@ -181,8 +184,13 @@ export class NavigationService {
     // Calculate what portion of the full route this represents
     // This is a simplified calculation - in reality, we'd need to check
     // if passenger's route overlaps with the main route
-    const factor = Math.min(passengerDistance / fullRouteDistance, 1.0);
-    return Math.max(factor, 0.1); // Minimum 10% factor
+    const factor = Math.min(passengerDistance / fullTripDistance, 1.0);
+    const partialDistanceFactor = Math.max(factor, 0.1); // Minimum 10% factor
+
+    return {
+      partialDistanceFactor,
+      partialDistanceKm: passengerDistance,
+    };
   }
 
   /**

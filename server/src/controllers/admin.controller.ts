@@ -3,7 +3,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { AppError } from '../middleware/errorHandler';
 import { pool } from '../database/connection';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 
 export const adminLogin = async (
   req: any,
@@ -31,10 +31,14 @@ export const adminLogin = async (
       return;
     }
 
+    const jwtSecret = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
+    const signOptions: SignOptions = {
+      expiresIn: '7d',
+    };
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'devsecret',
-      { expiresIn: '7d' }
+      jwtSecret,
+      signOptions
     );
 
     res.json({
