@@ -1,0 +1,24 @@
+{
+  "name": "carpooling-app",
+  "version": "1.0.0",
+  "description": "Carpooling Application for Pakistan - Based on BRD v2",
+  "main": "server/dist/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run mobile:dev\"",
+    "server:dev": "cd server && npm run dev",
+    "server:build": "cd server && npm run build",
+    "server:start": "cd server && npm start",
+    "mobile:dev": "cd mobile && npm start",
+    "mobile:android": "cd mobile && npm run android",
+    "mobile:ios": "cd mobile && npm run ios",
+    "admin:dev": "cd admin-portal && npm run dev",
+    "install-all": "npm install && cd server && npm install && cd ../mobile && npm install && cd ../admin-portal && npm install"
+  },
+  "keywords": ["carpooling", "ride-sharing", "pakistan"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+

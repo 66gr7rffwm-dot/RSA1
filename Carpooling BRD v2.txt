@@ -1,0 +1,245 @@
+
+
+
+
+Enterprise Business Requirements Document (BRD)
+Carpooling Application – Pakistan
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Table of Contents
+Enterprise Business Requirements Document (BRD)	1
+Carpooling Application – Pakistan	1
+1. Executive Summary	3
+2. Business Context & Market Analysis	3
+3. Stakeholders & User Personas	4
+4. Functional Requirements	4
+4.1 User Registration & Authentication	4
+4.2 Driver KYC & Verification	4
+4.3 Vehicle Management	4
+4.4 Route & Trip Management	5
+4.5 Booking Flow	5
+4.6 Subscription Model	5
+4.7 Pricing Mechanism (Formula-Based)	5
+4.8 AI-Based Navigation & Route Optimization	7
+4.9 Payments	7
+4.10 Ratings & Safety	7
+4.11 Admin Portal	7
+5. Non-Functional Requirements	7
+6. Risks & Mitigation	8
+7. Future Enhancements & Roadmap	8
+
+
+
+
+
+
+
+
+
+
+
+
+1. Executive Summary
+The purpose of this document is to define the requirements for a formal car pooling platform tailored for Pakistan, addressing rising fuel costs, traffic congestion, and informal carpooling inefficiencies. The platform enables cost sharing, trust through KYC, AI-driven route optimization, and transparency in pricing.
+Business Need: 
+	•	High fuel and transportation costs 
+	•	Traffic congestion in major cities (Islamabad, Lahore, Karachi) 
+	•	Lack of verified pooling options for commuters
+Solution Overview: 
+	•	Mobile apps for iOS and Android 
+	•	KYC-verified drivers and registered vehicles 
+	•	AI-based route optimization and cost calculation 
+	•	Monthly subscription model (500 PKR) 
+	•	Max 3 passengers per ride with partial journey support
+Benefits:
+	•	Reduce commuting costs 
+	•	Optimize vehicle usage 
+	•	Increase commuter safety and trust 
+	•	Improve route efficiency and punctuality
+
+2. Business Context & Market Analysis
+Current State: 
+	•	Informal carpooling through WhatsApp/Facebook groups lacks verification and reliability. 
+	•	Commuters face uncertainty in cost, safety, and punctuality.
+Market Opportunity: 
+	•	Large urban populations in Pakistan rely on daily commute. 
+	•	Fuel prices averaging 250 PKR/liter create high monthly expenses. 
+	•	Estimated potential user base: 200,000+ daily commuters.
+Regulatory Context:
+	•	Government regulations require vehicle verification and CNIC for ridesharing.
+	•	Compliance with provincial transport and token tax requirements.
+
+3. Stakeholders & User Personas
+Drivers: 
+	•	Verified through KYC 
+	•	Offer rides for fixed or semi-fixed commutes 
+	•	Track earnings, ratings, and schedules
+Passengers: 
+	•	Book rides along existing routes 
+	•	Pay proportionally for distance traveled 
+	•	Rate drivers and provide feedback
+Admin: 
+	•	Manages driver and passenger registrations 
+	•	Approves KYC, handles disputes 
+	•	Monitors platform metrics and analytics
+
+4. Functional Requirements
+4.1 User Registration & Authentication
+	•	Mobile number/email signup
+	•	OTP verification
+	•	Secure password management
+	•	Role selection: Driver/Passenger
+	•	Account recovery options
+4.2 Driver KYC & Verification
+	•	Upload CNIC, driving license, vehicle registration, token tax
+	•	Selfie verification for identity matching
+	•	Admin approval workflow with status tracking (Pending, Approved, Rejected)
+	•	Notifications for approval/rejection
+4.3 Vehicle Management
+	•	Add/edit multiple vehicles per driver
+	•	Provide vehicle details (make, model, year, fuel type, seating capacity)
+	•	Upload vehicle images
+	•	Maintenance records (optional for future phases)
+4.4 Route & Trip Management
+	•	Define usual commute routes and time windows
+	•	Add intermediate pickup/drop points
+	•	Configure recurring trips
+	•	Set maximum seats per trip
+	•	Edit and cancel trips
+4.5 Booking Flow
+	•	Passengers search for routes and available seats
+	•	Select pickup/drop-off points
+	•	Display real-time cost based on AI-calculated distance
+	•	Confirm bookings and send notifications to drivers
+	•	Partial journey handling with cost proportionality
+4.6 Subscription Model
+	•	Fixed monthly subscription of 500 PKR
+	•	Required for both drivers and passengers
+	•	No per-ride commission
+	•	Subscription auto-renewal and management in app
+4.7 Pricing Mechanism (Formula-Based)
+Core Principle
+The platform operates strictly on cost sharing, not profit. Pricing is computed algorithmically using distance, vehicle type, and occupancy.
+	•	Base Trip Cost Formula
+	•	
+	•	Where:
+	•	Distance = AI-calculated route distance
+	•	FuelRatePerKm = System-configured (fuel price based)
+	•	VehicleFactor = Adjustment for vehicle type
+	•	Partial Distance Factor
+	•	
+	•	Driver Contribution Logic
+	•	If 1 passenger only:
+	•	
+	•	DriverShareFactor = 0.5
+	•	Example: TotalTripCost = 500 PKR → DriverContribution = 500 × 0.5 = 250 PKR
+	•	Passenger pays remaining 250 PKR
+	•	(Example DriverShareFactor = 0.5)
+	•	If 2 or 3 passengers:
+	•	
+	•	All passengers share the cost equally
+	•	Driver does not pay any portion
+	•	Passenger Cost Formula
+	•	
+	•	Where:
+	•	N = Number of passengers (max 3)
+	•	Example 1 – Full Route (G13 → Blue Area)
+	•	Distance = 20 km
+	•	FuelRatePerKm = 25 PKR
+	•	VehicleFactor = 1.0
+	•	
+	•	2 passengers
+	•	Each passenger pays 250 PKR
+	•	Driver pays 0 PKR
+	•	Example 2 – Single Passenger
+	•	TotalTripCost = 500 PKR
+	•	DriverShareFactor = 0.5
+	•	
+	•	Passenger pays 250 PKR
+	•	Driver pays 250 PKR
+	•	Example 3 – Partial Route (G13 → G9, 10 km)
+	•	Total route = 20 km
+	•	Passenger travels = 10 km
+	•	PartialDistanceFactor = 10 / 20 = 0.5
+	•	TotalTripCost = 500 PKR
+	•	DriverContribution (single passenger) = 500 × 0.5 = 250 PKR
+	•	Passenger pays = (TotalTripCost - DriverContribution) × PartialDistanceFactor = (500 - 250) × 0.5 = 125 PKR
+	•	Driver pays = DriverContribution + remaining trip portion = 250 + (TotalTripCost - DriverContribution) × (1 - PartialDistanceFactor) = 250 + 125 = 375 PKR
+4.8 AI-Based Navigation & Route Optimization
+	•	Calculates best route between source and destination considering traffic, distance, and time
+	•	Re-routes dynamically based on traffic conditions
+	•	Optimizes pickup/drop sequence for multiple passengers
+	•	Supports partial journey distance tracking
+	•	Feeds accurate distance into pricing engine
+	•	Provides predictive ETA and alerts
+	•	In-app turn-by-turn navigation (Urdu & English voice guidance)
+	•	AI learning from historical trips to improve future routing
+4.9 Payments
+	•	Supported modes: JazzCash, EasyPaisa, IBFT, Debit Cards
+	•	Upfront trip payment from passenger
+	•	Subscription auto-renewal
+	•	Refund handling for cancellations
+4.10 Ratings & Safety
+	•	Two-way rating system (drivers and passengers)
+	•	SOS button for emergencies
+	•	Masked communication between passengers and drivers
+	•	Women-only ride option for safety
+4.11 Admin Portal
+	•	Secure admin login with JWT authentication and session management
+	•	Comprehensive user management with role-based access control
+	•	Driver KYC verification with document preview and approval workflow
+	•	Vehicle management with registration details and driver association
+	•	Route and trip management with recurring trip scheduling
+	•	Real-time analytics dashboard with key performance indicators
+	•	Pricing and AI parameter configuration with formula-based controls
+	•	Dispute and complaint resolution system with tracking
+	•	Advanced reporting with revenue, occupancy, and route efficiency metrics
+	•	Recent activity monitoring with audit trail
+	•	User status management (activate/deactivate accounts)
+	•	Password reset functionality for users
+	•	Responsive design for mobile and desktop access
+	•	Real-time notifications for KYC requests and system events
+
+5. Non-Functional Requirements
+	•	System availability 99.9%
+	•	Secure handling of CNIC and personal data
+	•	Optimized for low bandwidth environments
+	•	Logging, monitoring, and alerting for platform health
+	•	Scalable architecture for future growth
+
+6. Risks & Mitigation
+Risk
+Mitigation
+Driver no-show
+Ratings, penalties, alternative drivers
+Passenger safety
+KYC, SOS button, women-only rides
+Regulatory issues
+Position platform as cost-sharing, maintain compliance records
+Low adoption
+Referral programs, awareness campaigns, corporate tie-ups
+Technical failures
+Backup systems, monitoring, load testing
+
+7. Future Enhancements & Roadmap
+	•	Corporate and university pooling integrations
+	•	Carbon footprint and fuel efficiency tracking
+	•	Predictive AI-based ride matching
+	•	Dynamic pricing adjustments based on fuel rates
+	•	Driver/passenger loyalty and reward programs
+
