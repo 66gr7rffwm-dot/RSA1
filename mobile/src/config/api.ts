@@ -2,11 +2,12 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Configuration
-// Update PRODUCTION_API_URL with your deployed backend URL
-const PRODUCTION_API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://your-api.railway.app/api';
-const LOCAL_API_URL = 'http://11.11.10.194:5001/api';
+// Production API URL - Railway deployment
+const PRODUCTION_API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://carpooling-api-production-36c8.up.railway.app/api';
+const LOCAL_API_URL = 'http://localhost:5001/api';
 
-const API_BASE_URL = __DEV__ ? LOCAL_API_URL : PRODUCTION_API_URL;
+// Use production API in all builds for testing
+const API_BASE_URL = PRODUCTION_API_URL;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
