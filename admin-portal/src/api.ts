@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-// Use relative path to leverage Vite's proxy in development
-// This avoids CORS issues by proxying through the same origin
+// Use environment variable for API URL in production, or relative path in development
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
