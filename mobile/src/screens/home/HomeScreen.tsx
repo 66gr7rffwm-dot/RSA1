@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { colors, typography, spacing, borderRadius, shadows, gradients } from '../../theme';
@@ -12,25 +12,44 @@ interface QuickStats {
   activeTrips?: number;
   upcomingBookings?: number;
   totalRides?: number;
+  totalEarnings?: number;
+}
+
+interface KYCStatus {
+  status: 'not_submitted' | 'pending' | 'approved' | 'rejected';
+  verification_status?: string;
+  rejection_reason?: string;
 }
 
 const HomeScreen = () => {
   const { user } = useAuth();
   const navigation = useNavigation();
   const [stats, setStats] = useState<QuickStats>({});
+  const [kycStatus, setKycStatus] = useState<KYCStatus | null>(null);
+  const [loadingKYC, setLoadingKYC] = useState(true);
 
   useEffect(() => {
     loadStats();
-  }, []);
+    if (user?.role === 'driver') {
+      loadKYCStatus();
+    }
+  }, [user]);
 
   const loadStats = async () => {
     try {
       if (user?.role === 'driver') {
         const res = await api.get('/trips/my-trips');
         const trips = res.data.data || [];
+        
+        // Calculate earnings (assuming each trip has earnings)
+        const totalEarnings = trips.reduce((sum: number, trip: any) => {
+          return sum + (trip.total_earnings || trip.earnings || 0);
+        }, 0);
+
         setStats({
           activeTrips: trips.filter((t: any) => new Date(t.trip_date) >= new Date()).length,
           totalRides: trips.length,
+          totalEarnings: totalEarnings,
         });
       } else {
         const res = await api.get('/bookings/my-bookings');
@@ -47,7 +66,57 @@ const HomeScreen = () => {
     }
   };
 
+  const loadKYCStatus = async () => {
+    try {
+      setLoadingKYC(true);
+      const res = await api.get('/drivers/kyc/status');
+      if (res.data.data) {
+        setKycStatus({
+          status: res.data.data.verification_status || res.data.data.status || 'not_submitted',
+          verification_status: res.data.data.verification_status,
+          rejection_reason: res.data.data.rejection_reason,
+        });
+      } else {
+        setKycStatus({ status: 'not_submitted' });
+      }
+    } catch (error: any) {
+      // If 404 or no KYC, set to not_submitted
+      setKycStatus({ status: 'not_submitted' });
+    } finally {
+      setLoadingKYC(false);
+    }
+  };
+
   const isDriver = user?.role === 'driver';
+  const kycNotComplete = isDriver && kycStatus && kycStatus.status !== 'approved';
+
+  const getKYCStatusColor = () => {
+    if (!kycStatus) return colors.warning;
+    switch (kycStatus.status) {
+      case 'approved':
+        return colors.success;
+      case 'pending':
+        return colors.warning;
+      case 'rejected':
+        return colors.error;
+      default:
+        return colors.warning;
+    }
+  };
+
+  const getKYCStatusText = () => {
+    if (!kycStatus) return 'Unknown';
+    switch (kycStatus.status) {
+      case 'approved':
+        return 'Approved ✓';
+      case 'pending':
+        return 'Pending Verification';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return 'Not Submitted';
+    }
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -76,6 +145,43 @@ const HomeScreen = () => {
         </View>
       </LinearGradient>
 
+      {/* KYC Status Banner for Drivers */}
+      {isDriver && kycNotComplete && !loadingKYC && (
+        <View style={styles.kycBanner}>
+          <View style={[styles.kycStatusIndicator, { backgroundColor: getKYCStatusColor() }]} />
+          <View style={styles.kycContent}>
+            <Text style={styles.kycTitle}>
+              {kycStatus.status === 'not_submitted' 
+                ? 'KYC Verification Required' 
+                : `KYC Status: ${getKYCStatusText()}`}
+            </Text>
+            <Text style={styles.kycMessage}>
+              {kycStatus.status === 'not_submitted'
+                ? 'Please complete your KYC verification to start accepting rides.'
+                : kycStatus.status === 'pending'
+                ? 'Your KYC documents are under review. You can still create trips, but approval is required for full access.'
+                : kycStatus.status === 'rejected'
+                ? kycStatus.rejection_reason || 'Your KYC was rejected. Please update your documents.'
+                : 'Complete your KYC to unlock all features.'}
+            </Text>
+            <TouchableOpacity
+              style={styles.kycButton}
+              onPress={() => navigation.navigate('Profile' as never, { screen: 'DriverKYC' } as never)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={gradients.primary}
+                style={styles.kycButtonGradient}
+              >
+                <Text style={styles.kycButtonText}>
+                  {kycStatus.status === 'not_submitted' ? 'Complete KYC' : 'View/Update KYC'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Quick Stats Cards */}
       <View style={styles.statsContainer}>
         {isDriver ? (
@@ -93,6 +199,13 @@ const HomeScreen = () => {
               </View>
               <Text style={styles.statValue}>{stats.totalRides || 0}</Text>
               <Text style={styles.statLabel}>Total Rides</Text>
+            </View>
+            <View style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: colors.warningLight }]}>
+                <Text style={styles.statIconText}>💰</Text>
+              </View>
+              <Text style={styles.statValue}>PKR {stats.totalEarnings?.toFixed(0) || '0'}</Text>
+              <Text style={styles.statLabel}>Total Earnings</Text>
             </View>
           </>
         ) : (
@@ -115,16 +228,51 @@ const HomeScreen = () => {
         )}
       </View>
 
+      {/* Driver Information Card */}
+      {isDriver && (
+        <View style={styles.driverInfoCard}>
+          <Text style={styles.driverInfoTitle}>📈 Driver Dashboard</Text>
+          <View style={styles.driverInfoRow}>
+            <View style={styles.driverInfoItem}>
+              <Text style={styles.driverInfoLabel}>KYC Status</Text>
+              <View style={[styles.driverInfoBadge, { backgroundColor: getKYCStatusColor() }]}>
+                <Text style={styles.driverInfoBadgeText}>{getKYCStatusText()}</Text>
+              </View>
+            </View>
+            <View style={styles.driverInfoItem}>
+              <Text style={styles.driverInfoLabel}>Total Earnings</Text>
+              <Text style={styles.driverInfoValue}>PKR {stats.totalEarnings?.toFixed(0) || '0'}</Text>
+            </View>
+          </View>
+          <View style={styles.driverInfoRow}>
+            <View style={styles.driverInfoItem}>
+              <Text style={styles.driverInfoLabel}>Active Trips</Text>
+              <Text style={styles.driverInfoValue}>{stats.activeTrips || 0}</Text>
+            </View>
+            <View style={styles.driverInfoItem}>
+              <Text style={styles.driverInfoLabel}>Total Rides</Text>
+              <Text style={styles.driverInfoValue}>{stats.totalRides || 0}</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Main Action Button */}
       <View style={styles.mainActionContainer}>
         <TouchableOpacity
           style={styles.mainActionButton}
           onPress={() => {
-            if (isDriver) {
-              navigation.navigate('Search' as never, { screen: 'CreateTrip' } as never);
-            } else {
-              // Navigate to SearchRides screen directly
-              navigation.navigate('Search' as never, { screen: 'SearchRides' } as never);
+            try {
+              if (isDriver) {
+                navigation.navigate('Search' as never, { screen: 'CreateTrip' } as never);
+              } else {
+                // Navigate to Search tab, which will show SearchRides by default
+                navigation.navigate('Search' as never);
+              }
+            } catch (error) {
+              console.error('Navigation error:', error);
+              // Fallback: try direct navigation
+              navigation.navigate('Search' as never);
             }
           }}
           activeOpacity={0.8}
@@ -187,7 +335,13 @@ const HomeScreen = () => {
             <>
               <TouchableOpacity
                 style={styles.actionCard}
-                onPress={() => navigation.navigate('Search' as never)}
+                onPress={() => {
+                  try {
+                    navigation.navigate('Search' as never);
+                  } catch (error) {
+                    console.error('Navigation error:', error);
+                  }
+                }}
                 activeOpacity={0.7}
               >
                 <View style={[styles.actionIconContainer, { backgroundColor: colors.infoLight }]}>
@@ -297,6 +451,52 @@ const styles = StyleSheet.create({
     ...typography.h3,
     color: colors.primary,
   },
+  kycBanner: {
+    margin: spacing.lg,
+    marginTop: -spacing.lg,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  kycStatusIndicator: {
+    width: 4,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+  },
+  kycContent: {
+    padding: spacing.lg,
+    paddingLeft: spacing.lg + 4,
+  },
+  kycTitle: {
+    ...typography.h4,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+    fontWeight: '700',
+  },
+  kycMessage: {
+    ...typography.small,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    lineHeight: 20,
+  },
+  kycButton: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    ...shadows.sm,
+  },
+  kycButtonGradient: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+  },
+  kycButtonText: {
+    ...typography.smallMedium,
+    color: colors.white,
+    fontWeight: '700',
+  },
   statsContainer: {
     flexDirection: 'row',
     padding: spacing.lg,
@@ -332,6 +532,48 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  driverInfoCard: {
+    margin: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: colors.white,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    ...shadows.md,
+  },
+  driverInfoTitle: {
+    ...typography.h4,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+    fontWeight: '700',
+  },
+  driverInfoRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  driverInfoItem: {
+    flex: 1,
+  },
+  driverInfoLabel: {
+    ...typography.captionMedium,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  driverInfoValue: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  driverInfoBadge: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
+  },
+  driverInfoBadgeText: {
+    ...typography.captionMedium,
+    color: colors.white,
+    fontWeight: '700',
   },
   mainActionContainer: {
     paddingHorizontal: spacing.lg,

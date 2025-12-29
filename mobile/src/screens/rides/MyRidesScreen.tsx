@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, ScrollView, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
+import { colors, typography, spacing, borderRadius, shadows, gradients } from '../../theme';
+import { useNavigation } from '@react-navigation/native';
 
 interface Trip {
   id: string;
@@ -13,20 +16,52 @@ interface Trip {
   max_seats: number;
   available_seats: number;
   bookingId?: string; // for passenger side
+  earnings?: number;
+  total_earnings?: number;
+  total_distance_km?: number;
+  base_trip_cost?: number;
 }
 
 const MyRidesScreen = () => {
   const { user } = useAuth();
+  const navigation = useNavigation();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [driverStats, setDriverStats] = useState({
+    totalEarnings: 0,
+    totalTrips: 0,
+    completedTrips: 0,
+    activeTrips: 0,
+  });
 
   const loadTrips = async () => {
     setLoading(true);
     try {
       if (user?.role === 'driver') {
         const res = await api.get('/trips/my-trips');
-        setTrips(res.data.data || []);
+        const tripsData = res.data.data || [];
+        setTrips(tripsData);
+
+        // Calculate driver stats
+        const totalEarnings = tripsData.reduce((sum: number, trip: any) => {
+          return sum + (trip.total_earnings || trip.earnings || 0);
+        }, 0);
+
+        const completedTrips = tripsData.filter((t: any) => 
+          t.status === 'completed' || new Date(t.trip_date) < new Date()
+        ).length;
+
+        const activeTrips = tripsData.filter((t: any) => 
+          new Date(t.trip_date) >= new Date() && (t.status === 'active' || t.status === 'confirmed')
+        ).length;
+
+        setDriverStats({
+          totalEarnings,
+          totalTrips: tripsData.length,
+          completedTrips,
+          activeTrips,
+        });
       } else {
         const res = await api.get('/bookings/my-bookings');
         setTrips(
@@ -40,11 +75,12 @@ const MyRidesScreen = () => {
             max_seats: b.max_seats,
             available_seats: 0,
             bookingId: b.id,
+            base_trip_cost: b.cost || b.estimated_cost,
           }))
         );
       }
-    } catch {
-      // ignore for now
+    } catch (error) {
+      console.error('Error loading trips:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -53,66 +89,101 @@ const MyRidesScreen = () => {
 
   useEffect(() => {
     loadTrips();
-  }, []);
+  }, [user]);
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed':
+      case 'confirmed':
+        return colors.success;
+      case 'pending':
+      case 'active':
+        return colors.warning;
+      case 'cancelled':
+      case 'rejected':
+        return colors.error;
+      default:
+        return colors.textSecondary;
+    }
+  };
 
   const renderItem = ({ item }: { item: Trip }) => (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>
-        {item.origin_address} → {item.destination_address}
-      </Text>
-      <Text style={styles.cardText}>
-        {item.trip_date} at {item.trip_time}
-      </Text>
-      <Text style={styles.cardText}>Status: {item.status}</Text>
-      {typeof item.available_seats === 'number' && (
-        <Text style={styles.cardText}>
-          Seats: {item.available_seats}/{item.max_seats}
-        </Text>
-      )}
+      <View style={styles.cardHeader}>
+        <View style={styles.routeContainer}>
+          <View style={styles.locationDot}>
+            <View style={[styles.dot, styles.dotOrigin]} />
+            <View style={styles.line} />
+            <View style={[styles.dot, styles.dotDestination]} />
+          </View>
+          <View style={styles.routeText}>
+            <Text style={styles.origin} numberOfLines={1}>{item.origin_address}</Text>
+            <Text style={styles.destination} numberOfLines={1}>{item.destination_address}</Text>
+          </View>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+          <Text style={styles.statusText}>{item.status}</Text>
+        </View>
+      </View>
+
+      <View style={styles.cardDetails}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailIcon}>📅</Text>
+          <Text style={styles.detailText}>
+            {formatDate(item.trip_date)} at {item.trip_time}
+          </Text>
+        </View>
+        {item.total_distance_km && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailIcon}>📏</Text>
+            <Text style={styles.detailText}>{item.total_distance_km.toFixed(1)} km</Text>
+          </View>
+        )}
+        {typeof item.available_seats === 'number' && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailIcon}>💺</Text>
+            <Text style={styles.detailText}>
+              {item.available_seats}/{item.max_seats} seats
+            </Text>
+          </View>
+        )}
+        {user?.role === 'driver' && (item.earnings || item.total_earnings) && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailIcon}>💰</Text>
+            <Text style={[styles.detailText, styles.earningsText]}>
+              Earnings: PKR {(item.earnings || item.total_earnings || 0).toFixed(0)}
+            </Text>
+          </View>
+        )}
+        {user?.role === 'passenger' && item.base_trip_cost && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailIcon}>💰</Text>
+            <Text style={styles.detailText}>
+              Cost: PKR {item.base_trip_cost.toFixed(0)}
+            </Text>
+          </View>
+        )}
+      </View>
+
       {user?.role === 'passenger' && item.bookingId && (
         <TouchableOpacity
           style={styles.rateButton}
-          onPress={() =>
-            Alert.prompt?.(
-              'Rate Ride (1-5)',
-              'Optional comment:',
-              [
-                {
-                  text: 'Cancel',
-                  style: 'cancel',
-                },
-                {
-                  text: 'Submit',
-                  onPress: async (value) => {
-                    const [ratingStr, ...commentParts] = String(value || '').split(' ');
-                    const rating = parseInt(ratingStr || '5', 10);
-                    const comment = commentParts.join(' ');
-                    if (Number.isNaN(rating) || rating < 1 || rating > 5) {
-                      Alert.alert('Error', 'Rating must be between 1 and 5');
-                      return;
-                    }
-                    try {
-                      await api.post('/ratings', {
-                        bookingId: item.bookingId,
-                        rating,
-                        comment,
-                      });
-                      Alert.alert('Thank you', 'Your rating has been submitted.');
-                    } catch (e: any) {
-                      Alert.alert(
-                        'Error',
-                        e.response?.data?.error || 'Failed to submit rating'
-                      );
-                    }
-                  },
-                },
-              ],
-              'plain-text',
-              '5 Great ride'
-            ) || Alert.alert('Rate', 'Rating UI not supported on this platform.')
-          }
+          onPress={() => {
+            // Rating functionality
+            Alert.alert('Rate Ride', 'Rating feature coming soon!');
+          }}
+          activeOpacity={0.7}
         >
-          <Text style={styles.rateText}>Rate</Text>
+          <Text style={styles.rateText}>Rate Ride</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -121,69 +192,297 @@ const MyRidesScreen = () => {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading rides...</Text>
       </View>
     );
   }
 
   return (
-    <FlatList
-      style={styles.list}
-      data={trips}
-      keyExtractor={(item) => item.id}
-      renderItem={renderItem}
-      ListEmptyComponent={
-        <View style={styles.center}>
-          <Text>No rides yet.</Text>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Driver Stats Header */}
+      {user?.role === 'driver' && driverStats.totalTrips > 0 && (
+        <View style={styles.statsHeader}>
+          <LinearGradient
+            colors={gradients.primary}
+            style={styles.statsGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Text style={styles.statsTitle}>📊 Driver Statistics</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>PKR {driverStats.totalEarnings.toFixed(0)}</Text>
+                <Text style={styles.statLabel}>Total Earnings</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{driverStats.totalTrips}</Text>
+                <Text style={styles.statLabel}>Total Trips</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{driverStats.completedTrips}</Text>
+                <Text style={styles.statLabel}>Completed</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{driverStats.activeTrips}</Text>
+                <Text style={styles.statLabel}>Active</Text>
+              </View>
+            </View>
+          </LinearGradient>
         </View>
-      }
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadTrips(); }} />
-      }
-    />
+      )}
+
+      {/* Rides List */}
+      {trips.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>
+            {user?.role === 'driver' ? '🚗' : '📋'}
+          </Text>
+          <Text style={styles.emptyTitle}>No rides yet</Text>
+          <Text style={styles.emptyText}>
+            {user?.role === 'driver'
+              ? 'Create your first trip to start earning!'
+              : 'Book your first ride to get started!'}
+          </Text>
+          {user?.role === 'driver' && (
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={() => navigation.navigate('Search' as never, { screen: 'CreateTrip' } as never)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={gradients.primary}
+                style={styles.createButtonGradient}
+              >
+                <Text style={styles.createButtonText}>Create Trip</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        <View style={styles.listContainer}>
+          <Text style={styles.listHeader}>
+            {user?.role === 'driver' ? 'My Trips' : 'My Bookings'} ({trips.length})
+          </Text>
+          <FlatList
+            data={trips}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            scrollEnabled={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={loadTrips}
+                colors={[colors.primary]}
+              />
+            }
+          />
+        </View>
+      )}
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  list: {
+  container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   center: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+  },
+  statsHeader: {
+    margin: spacing.lg,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.lg,
+  },
+  statsGradient: {
+    padding: spacing.lg,
+  },
+  statsTitle: {
+    ...typography.h3,
+    color: colors.white,
+    marginBottom: spacing.md,
+    fontWeight: '700',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  statItem: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  statValue: {
+    ...typography.h3,
+    color: colors.white,
+    marginBottom: spacing.xs,
+    fontWeight: '700',
+  },
+  statLabel: {
+    ...typography.caption,
+    color: colors.white,
+    opacity: 0.9,
+  },
+  listContainer: {
+    padding: spacing.lg,
+  },
+  listHeader: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+    fontWeight: '700',
   },
   card: {
-    marginHorizontal: 12,
-    marginVertical: 6,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: '#F7F7F7',
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.md,
   },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 4,
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
   },
-  cardText: {
-    fontSize: 13,
-    color: '#555',
+  routeContainer: {
+    flexDirection: 'row',
+    flex: 1,
+    gap: spacing.sm,
+  },
+  locationDot: {
+    alignItems: 'center',
+    width: 24,
+  },
+  dot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  dotOrigin: {
+    backgroundColor: colors.primary,
+  },
+  line: {
+    width: 2,
+    flex: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.xs,
+  },
+  dotDestination: {
+    backgroundColor: colors.success,
+  },
+  routeText: {
+    flex: 1,
+  },
+  origin: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  destination: {
+    ...typography.small,
+    color: colors.textSecondary,
+  },
+  statusBadge: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.sm,
+    marginLeft: spacing.sm,
+  },
+  statusText: {
+    ...typography.captionMedium,
+    color: colors.white,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  cardDetails: {
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  detailIcon: {
+    fontSize: 18,
+    width: 24,
+  },
+  detailText: {
+    ...typography.small,
+    color: colors.textSecondary,
+  },
+  earningsText: {
+    ...typography.bodyMedium,
+    color: colors.success,
+    fontWeight: '700',
   },
   rateButton: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#FF9500',
+    backgroundColor: colors.primaryContainer,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginTop: spacing.sm,
   },
   rateText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
+    ...typography.smallMedium,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xxl,
+    minHeight: 400,
+  },
+  emptyIcon: {
+    fontSize: 80,
+    marginBottom: spacing.lg,
+  },
+  emptyTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    fontWeight: '700',
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+  createButton: {
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  createButtonGradient: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+  },
+  createButtonText: {
+    ...typography.button,
+    color: colors.white,
+    fontWeight: '700',
   },
 });
 
 export default MyRidesScreen;
-

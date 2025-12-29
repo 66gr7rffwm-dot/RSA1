@@ -60,8 +60,21 @@ const RegisterScreen = () => {
         fullName: formData.fullName,
         role: formData.role,
       });
-      Alert.alert('Success', 'Registration successful! Please verify OTP.');
-      navigation.navigate('OTPVerification' as never, { phoneNumber: formData.phoneNumber } as never);
+      if (formData.role === 'driver') {
+        Alert.alert(
+          'Success', 
+          'Registration successful! Please verify OTP. After verification, you will need to complete KYC verification to start accepting rides.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('OTPVerification' as never, { phoneNumber: formData.phoneNumber } as never),
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Success', 'Registration successful! Please verify OTP.');
+        navigation.navigate('OTPVerification' as never, { phoneNumber: formData.phoneNumber } as never);
+      }
     } catch (error: any) {
       Alert.alert('Registration Failed', error.message);
     } finally {

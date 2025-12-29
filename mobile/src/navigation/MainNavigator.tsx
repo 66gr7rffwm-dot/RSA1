@@ -21,18 +21,24 @@ const RidesStack = () => {
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#4f46e5',
+          backgroundColor: '#6366F1',
         },
         headerTintColor: '#fff',
         headerTitleStyle: {
           fontWeight: '700',
         },
       }}
+      initialRouteName="SearchRides"
     >
       <Stack.Screen 
         name="SearchRides" 
         component={SearchRidesScreen} 
         options={{ title: 'Find Rides' }} 
+      />
+      <Stack.Screen 
+        name="CreateTrip" 
+        component={CreateTripScreen} 
+        options={{ title: 'Create Trip' }} 
       />
       <Stack.Screen 
         name="TripDetails" 
@@ -53,7 +59,7 @@ const ProfileStack = () => {
     <Stack.Navigator
       screenOptions={{
         headerStyle: {
-          backgroundColor: '#4f46e5',
+          backgroundColor: '#6366F1',
         },
         headerTintColor: '#fff',
         headerTitleStyle: {
@@ -90,7 +96,7 @@ const MainNavigator = () => {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#4f46e5',
+        tabBarActiveTintColor: '#6366F1',
         tabBarInactiveTintColor: '#6b7280',
         tabBarStyle: {
           backgroundColor: '#fff',

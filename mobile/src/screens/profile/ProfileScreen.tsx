@@ -1,17 +1,25 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius, shadows, gradients } from '../../theme';
+import api from '../../config/api';
 
 const { width } = Dimensions.get('window');
+
+interface KYCStatus {
+  status: 'not_submitted' | 'pending' | 'approved' | 'rejected';
+  verification_status?: string;
+}
 
 const ProfileScreen = () => {
   const { user, logout } = useAuth();
   const navigation = useNavigation();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const [kycStatus, setKycStatus] = useState<KYCStatus | null>(null);
+  const [loadingKYC, setLoadingKYC] = useState(true);
 
   useEffect(() => {
     Animated.parallel([
@@ -26,10 +34,75 @@ const ProfileScreen = () => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+
+    if (user?.role === 'driver') {
+      loadKYCStatus();
+    }
+  }, [user]);
+
+  const loadKYCStatus = async () => {
+    try {
+      setLoadingKYC(true);
+      const res = await api.get('/drivers/kyc/status');
+      if (res.data.data) {
+        setKycStatus({
+          status: res.data.data.verification_status || res.data.data.status || 'not_submitted',
+          verification_status: res.data.data.verification_status,
+        });
+      } else {
+        setKycStatus({ status: 'not_submitted' });
+      }
+    } catch (error: any) {
+      setKycStatus({ status: 'not_submitted' });
+    } finally {
+      setLoadingKYC(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
+  };
+
+  const getKYCStatusColor = () => {
+    if (!kycStatus) return colors.primary;
+    switch (kycStatus.status) {
+      case 'approved':
+        return colors.success;
+      case 'pending':
+        return colors.warning;
+      case 'rejected':
+        return colors.error;
+      default:
+        return colors.primary;
+    }
+  };
+
+  const getKYCStatusText = () => {
+    if (!kycStatus) return 'KYC';
+    switch (kycStatus.status) {
+      case 'approved':
+        return 'KYC ✓ Approved';
+      case 'pending':
+        return 'KYC ⏳ Pending';
+      case 'rejected':
+        return 'KYC ✗ Rejected';
+      default:
+        return 'Complete KYC';
+    }
+  };
+
+  const getKYCStatusIcon = () => {
+    if (!kycStatus) return '📋';
+    switch (kycStatus.status) {
+      case 'approved':
+        return '✅';
+      case 'pending':
+        return '⏳';
+      case 'rejected':
+        return '❌';
+      default:
+        return '📋';
+    }
   };
 
   return (
@@ -125,6 +198,22 @@ const ProfileScreen = () => {
             </Text>
           </View>
         </View>
+        {user?.role === 'driver' && kycStatus && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.infoRow}>
+              <View style={styles.infoIcon}>
+                <Text style={styles.infoIconText}>📋</Text>
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>KYC Status</Text>
+                <View style={[styles.kycStatusBadge, { backgroundColor: getKYCStatusColor() }]}>
+                  <Text style={styles.kycStatusText}>{getKYCStatusText()}</Text>
+                </View>
+              </View>
+            </View>
+          </>
+        )}
       </Animated.View>
 
       {/* Action Buttons */}
@@ -150,47 +239,55 @@ const ProfileScreen = () => {
         </TouchableOpacity>
 
         {user?.role === 'driver' && (
-          <>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('DriverKYC' as never)}
-              activeOpacity={0.8}
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('DriverKYC' as never)}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[getKYCStatusColor(), getKYCStatusColor()]}
+              style={styles.actionButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
             >
-              <LinearGradient
-                colors={gradients.primary}
-                style={styles.actionButtonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.actionIcon}>📋</Text>
-                <View style={styles.actionTextContainer}>
-                  <Text style={styles.actionTitle}>Driver KYC</Text>
-                  <Text style={styles.actionSubtitle}>Complete or update</Text>
-                </View>
-                <Text style={styles.actionArrow}>→</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+              <Text style={styles.actionIcon}>{getKYCStatusIcon()}</Text>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>{getKYCStatusText()}</Text>
+                <Text style={styles.actionSubtitle}>
+                  {kycStatus?.status === 'approved' 
+                    ? 'View your verified documents' 
+                    : kycStatus?.status === 'pending'
+                    ? 'Documents under review'
+                    : kycStatus?.status === 'rejected'
+                    ? 'Update your documents'
+                    : 'Complete verification'}
+                </Text>
+              </View>
+              <Text style={styles.actionArrow}>→</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
 
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Vehicles' as never)}
-              activeOpacity={0.8}
+        {user?.role === 'driver' && (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Vehicles' as never)}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[colors.success, colors.successLight]}
+              style={styles.actionButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
             >
-              <LinearGradient
-                colors={[colors.success, colors.successLight]}
-                style={styles.actionButtonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.actionIcon}>🚗</Text>
-                <View style={styles.actionTextContainer}>
-                  <Text style={styles.actionTitle}>Manage Vehicles</Text>
-                  <Text style={styles.actionSubtitle}>Add or update vehicles</Text>
-                </View>
-                <Text style={styles.actionArrow}>→</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </>
+              <Text style={styles.actionIcon}>🚗</Text>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>Manage Vehicles</Text>
+                <Text style={styles.actionSubtitle}>Add or update vehicles</Text>
+              </View>
+              <Text style={styles.actionArrow}>→</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         )}
 
         <TouchableOpacity
@@ -307,6 +404,18 @@ const styles = StyleSheet.create({
     ...typography.bodyMedium,
     color: colors.textPrimary,
     fontWeight: '600',
+  },
+  kycStatusBadge: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
+    marginTop: spacing.xs,
+  },
+  kycStatusText: {
+    ...typography.smallMedium,
+    color: colors.white,
+    fontWeight: '700',
   },
   divider: {
     height: 1,
