@@ -32,6 +32,126 @@ interface Trip {
   base_trip_cost?: number;
 }
 
+// Separate component to avoid hooks in render function
+const TripCard = ({ item, index, navigation }: { item: Trip; index: number; navigation: any }) => {
+  const cardAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(cardAnim, {
+      toValue: 1,
+      duration: 400,
+      delay: index * 100,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        styles.cardContainer,
+        {
+          opacity: cardAnim,
+          transform: [
+            {
+              translateY: cardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [30, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate('TripDetails' as never, { tripId: item.id } as never)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.routeContainer}>
+            <View style={styles.locationDot}>
+              <View style={[styles.dot, styles.dotOrigin]} />
+              <View style={styles.line} />
+              <View style={[styles.dot, styles.dotDestination]} />
+            </View>
+            <View style={styles.routeText}>
+              <Text style={styles.origin} numberOfLines={1}>{item.origin_address}</Text>
+              <Text style={styles.destination} numberOfLines={1}>{item.destination_address}</Text>
+            </View>
+          </View>
+          {item.is_women_only && (
+            <View style={styles.womenOnlyBadge}>
+              <Text style={styles.womenOnlyText}>👩</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.cardDetails}>
+          <View style={styles.detailRow}>
+            <View style={styles.detailIcon}>
+              <Text style={styles.detailIconText}>📅</Text>
+            </View>
+            <Text style={styles.detailText}>
+              {formatDate(item.trip_date)} at {item.trip_time}
+            </Text>
+          </View>
+          {item.total_distance_km && (
+            <View style={styles.detailRow}>
+              <View style={styles.detailIcon}>
+                <Text style={styles.detailIconText}>📏</Text>
+              </View>
+              <Text style={styles.detailText}>{item.total_distance_km.toFixed(1)} km</Text>
+            </View>
+          )}
+          <View style={styles.detailRow}>
+            <View style={styles.detailIcon}>
+              <Text style={styles.detailIconText}>💺</Text>
+            </View>
+            <Text style={styles.detailText}>
+              {item.available_seats} {item.available_seats === 1 ? 'seat' : 'seats'} available
+            </Text>
+          </View>
+          {item.base_trip_cost && (
+            <View style={styles.detailRow}>
+              <View style={styles.detailIcon}>
+                <Text style={styles.detailIconText}>💰</Text>
+              </View>
+              <Text style={styles.detailText}>PKR {item.base_trip_cost.toFixed(0)}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.cardFooter}>
+          <TouchableOpacity
+            style={styles.bookButton}
+            onPress={() => navigation.navigate('TripDetails' as never, { tripId: item.id } as never)}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={gradients.primary}
+              style={styles.bookButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={styles.bookButtonText}>View Details</Text>
+              <Text style={styles.bookButtonArrow}>→</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { 
+    weekday: 'short', 
+    month: 'short', 
+    day: 'numeric' 
+  });
+};
+
 const SearchRidesScreen = () => {
   const navigation = useNavigation();
   const [date, setDate] = useState(getTodayDate());
@@ -97,115 +217,9 @@ const SearchRidesScreen = () => {
     }
   };
 
-  const renderItem = ({ item, index }: { item: Trip; index: number }) => {
-    const cardAnim = useRef(new Animated.Value(0)).current;
-
-    React.useEffect(() => {
-      Animated.timing(cardAnim, {
-        toValue: 1,
-        duration: 400,
-        delay: index * 100,
-        useNativeDriver: true,
-      }).start();
-    }, []);
-
-    return (
-      <Animated.View
-        style={[
-          styles.cardContainer,
-          {
-            opacity: cardAnim,
-            transform: [
-              {
-                translateY: cardAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [30, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => navigation.navigate('TripDetails' as never, { tripId: item.id } as never)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.cardHeader}>
-            <View style={styles.routeContainer}>
-              <View style={styles.locationDot}>
-                <View style={[styles.dot, styles.dotOrigin]} />
-                <View style={styles.line} />
-                <View style={[styles.dot, styles.dotDestination]} />
-              </View>
-              <View style={styles.routeText}>
-                <Text style={styles.origin} numberOfLines={1}>{item.origin_address}</Text>
-                <Text style={styles.destination} numberOfLines={1}>{item.destination_address}</Text>
-              </View>
-            </View>
-            {item.is_women_only && (
-              <View style={styles.womenOnlyBadge}>
-                <Text style={styles.womenOnlyText}>👩</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.cardDetails}>
-            <View style={styles.detailRow}>
-              <View style={styles.detailIcon}>
-                <Text style={styles.detailIconText}>📅</Text>
-              </View>
-              <Text style={styles.detailText}>
-                {formatDate(item.trip_date)} at {item.trip_time}
-              </Text>
-            </View>
-            {item.total_distance_km && (
-              <View style={styles.detailRow}>
-                <View style={styles.detailIcon}>
-                  <Text style={styles.detailIconText}>📏</Text>
-                </View>
-                <Text style={styles.detailText}>{item.total_distance_km.toFixed(1)} km</Text>
-              </View>
-            )}
-            <View style={styles.detailRow}>
-              <View style={styles.detailIcon}>
-                <Text style={styles.detailIconText}>💺</Text>
-              </View>
-              <Text style={styles.detailText}>
-                {item.available_seats} {item.available_seats === 1 ? 'seat' : 'seats'} available
-              </Text>
-            </View>
-            {item.base_trip_cost && (
-              <View style={styles.detailRow}>
-                <View style={styles.detailIcon}>
-                  <Text style={styles.detailIconText}>💰</Text>
-                </View>
-                <Text style={styles.detailText}>PKR {item.base_trip_cost.toFixed(0)}</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.cardFooter}>
-            <TouchableOpacity
-              style={styles.bookButton}
-              onPress={() => navigation.navigate('TripDetails' as never, { tripId: item.id } as never)}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={gradients.primary}
-                style={styles.bookButtonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.bookButtonText}>View Details</Text>
-                <Text style={styles.bookButtonArrow}>→</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
+  const renderItem = ({ item, index }: { item: Trip; index: number }) => (
+    <TripCard item={item} index={index} navigation={navigation} />
+  );
 
   const filterHeight = filterAnim.interpolate({
     inputRange: [0, 1],
@@ -441,15 +455,6 @@ const getTomorrowDate = () => {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   return tomorrow.toISOString().split('T')[0];
-};
-
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { 
-    weekday: 'short', 
-    month: 'short', 
-    day: 'numeric' 
-  });
 };
 
 const styles = StyleSheet.create({

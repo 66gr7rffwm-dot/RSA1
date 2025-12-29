@@ -2,14 +2,13 @@
   "expo": {
     "name": "Carpool",
     "slug": "carpooling-app",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#6366F1"
+      "backgroundColor": "#6366F1",
+      "resizeMode": "contain"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -28,7 +27,7 @@
         "backgroundColor": "#6366F1"
       },
       "package": "com.carpooling.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",

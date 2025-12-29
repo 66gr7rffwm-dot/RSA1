@@ -47,8 +47,8 @@ const CustomSplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           }),
         ]).start();
 
-        // Show splash for 15 seconds
-        await new Promise(resolve => setTimeout(resolve, 15000));
+        // Show splash for 3 seconds
+        await new Promise(resolve => setTimeout(resolve, 3000));
       } catch (e) {
         console.warn(e);
       } finally {
