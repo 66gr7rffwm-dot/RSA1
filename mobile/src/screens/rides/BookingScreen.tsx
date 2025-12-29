@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -7,11 +7,16 @@ import {
   TouchableOpacity, 
   ActivityIndicator, 
   Alert,
-  ScrollView 
+  ScrollView,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import api from '../../config/api';
+import { colors, typography, spacing, borderRadius, shadows, gradients } from '../../theme';
 
 const BookingScreen = () => {
   const route = useRoute<any>();
@@ -28,10 +33,41 @@ const BookingScreen = () => {
   const [price, setPrice] = useState<number | null>(null);
   const [sosLoading, setSosLoading] = useState(false);
   const [calculatingPrice, setCalculatingPrice] = useState(false);
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const priceAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   useEffect(() => {
     getCurrentLocation();
   }, []);
+
+  useEffect(() => {
+    if (price !== null) {
+      Animated.spring(priceAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [price]);
 
   const getCurrentLocation = async () => {
     try {
@@ -45,7 +81,6 @@ const BookingScreen = () => {
       setPickupLatitude(location.coords.latitude.toString());
       setPickupLongitude(location.coords.longitude.toString());
 
-      // Reverse geocode to get address
       const addresses = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -69,8 +104,6 @@ const BookingScreen = () => {
 
     setCalculatingPrice(true);
     try {
-      // In a real app, you'd call an API endpoint to calculate price
-      // For now, we'll estimate based on distance
       const res = await api.post('/bookings/estimate', {
         tripId: trip?.id,
         pickupLatitude: parseFloat(pickupLatitude),
@@ -168,328 +201,527 @@ const BookingScreen = () => {
         <Text style={styles.errorIcon}>❌</Text>
         <Text style={styles.errorTitle}>No trip selected</Text>
         <Text style={styles.errorText}>Please go back and select a trip to book.</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Go Back</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={gradients.primary}
+            style={styles.backButtonGradient}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Route Header */}
-      <View style={styles.routeHeader}>
-        <View style={styles.routeVisual}>
-          <View style={styles.locationDot}>
-            <View style={styles.dot} />
-            <View style={styles.line} />
-            <View style={[styles.dot, styles.dotDestination]} />
-          </View>
-          <View style={styles.routeText}>
-            <Text style={styles.origin}>{trip.origin_address}</Text>
-            <Text style={styles.destination}>{trip.destination_address}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Pickup Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>📍 Pickup Location</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Pickup Address"
-          value={pickupAddress}
-          onChangeText={setPickupAddress}
-          placeholderTextColor="#9ca3af"
-        />
-        <View style={styles.coordsRow}>
-          <TextInput
-            style={[styles.input, styles.coordInput]}
-            placeholder="Latitude"
-            value={pickupLatitude}
-            onChangeText={setPickupLatitude}
-            keyboardType="numeric"
-            placeholderTextColor="#9ca3af"
-          />
-          <TextInput
-            style={[styles.input, styles.coordInput]}
-            placeholder="Longitude"
-            value={pickupLongitude}
-            onChangeText={setPickupLongitude}
-            keyboardType="numeric"
-            placeholderTextColor="#9ca3af"
-          />
-        </View>
-        <TouchableOpacity style={styles.locationButton} onPress={getCurrentLocation}>
-          <Text style={styles.locationButtonText}>📍 Use Current Location</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Dropoff Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🎯 Drop-off Location</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Drop-off Address"
-          value={dropoffAddress}
-          onChangeText={setDropoffAddress}
-          placeholderTextColor="#9ca3af"
-        />
-        <View style={styles.coordsRow}>
-          <TextInput
-            style={[styles.input, styles.coordInput]}
-            placeholder="Latitude"
-            value={dropoffLatitude}
-            onChangeText={setDropoffLatitude}
-            keyboardType="numeric"
-            placeholderTextColor="#9ca3af"
-          />
-          <TextInput
-            style={[styles.input, styles.coordInput]}
-            placeholder="Longitude"
-            value={dropoffLongitude}
-            onChangeText={setDropoffLongitude}
-            keyboardType="numeric"
-            placeholderTextColor="#9ca3af"
-          />
-        </View>
-      </View>
-
-      {/* Price Estimate */}
-      {calculatingPrice ? (
-        <View style={styles.priceCard}>
-          <ActivityIndicator size="small" color="#4f46e5" />
-          <Text style={styles.priceCalculating}>Calculating price...</Text>
-        </View>
-      ) : price !== null ? (
-        <View style={styles.priceCard}>
-          <Text style={styles.priceLabel}>Estimated Cost</Text>
-          <Text style={styles.priceValue}>PKR {price.toFixed(0)}</Text>
-          <Text style={styles.priceNote}>
-            Final cost may vary based on exact route and traffic conditions
-          </Text>
-        </View>
-      ) : null}
-
-      {/* Info Banner */}
-      <View style={styles.infoBanner}>
-        <Text style={styles.infoIcon}>ℹ️</Text>
-        <View style={styles.infoContent}>
-          <Text style={styles.infoText}>
-            Make sure your pickup and drop-off locations are accurate. 
-            The driver will use these coordinates to navigate to you.
-          </Text>
-        </View>
-      </View>
-
-      {/* Action Buttons */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.bookButton}
-          onPress={handleBook}
-          disabled={loading || !pickupAddress || !dropoffAddress}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Route Header */}
+        <LinearGradient
+          colors={gradients.primary}
+          style={styles.routeHeader}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.bookButtonText}>Confirm Booking</Text>
-          )}
-        </TouchableOpacity>
+          <Animated.View
+            style={[
+              styles.routeContent,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View style={styles.routeVisual}>
+              <View style={styles.locationDot}>
+                <View style={[styles.dot, styles.dotOrigin]} />
+                <View style={styles.line} />
+                <View style={[styles.dot, styles.dotDestination]} />
+              </View>
+              <View style={styles.routeText}>
+                <Text style={styles.origin} numberOfLines={2}>{trip.origin_address}</Text>
+                <Text style={styles.destination} numberOfLines={2}>{trip.destination_address}</Text>
+              </View>
+            </View>
+          </Animated.View>
+        </LinearGradient>
 
-        <TouchableOpacity
-          style={styles.sosButton}
-          onPress={sendSOS}
-          disabled={sosLoading}
+        {/* Pickup Section */}
+        <Animated.View
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
         >
-          {sosLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.sosIcon}>🚨</Text>
-              <Text style={styles.sosText}>SOS Emergency</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>📍</Text>
+            <Text style={styles.sectionTitle}>Pickup Location</Text>
+          </View>
+          <View
+            style={[
+              styles.inputContainer,
+              focusedInput === 'pickup' && styles.inputContainerFocused,
+            ]}
+          >
+            <TextInput
+              style={styles.input}
+              placeholder="Pickup Address"
+              value={pickupAddress}
+              onChangeText={setPickupAddress}
+              placeholderTextColor={colors.textTertiary}
+              onFocus={() => setFocusedInput('pickup')}
+              onBlur={() => setFocusedInput(null)}
+            />
+          </View>
+          <View style={styles.coordsRow}>
+            <View
+              style={[
+                styles.inputContainer,
+                styles.coordInput,
+                focusedInput === 'pickupLat' && styles.inputContainerFocused,
+              ]}
+            >
+              <TextInput
+                style={styles.input}
+                placeholder="Latitude"
+                value={pickupLatitude}
+                onChangeText={setPickupLatitude}
+                keyboardType="numeric"
+                placeholderTextColor={colors.textTertiary}
+                onFocus={() => setFocusedInput('pickupLat')}
+                onBlur={() => setFocusedInput(null)}
+              />
+            </View>
+            <View
+              style={[
+                styles.inputContainer,
+                styles.coordInput,
+                focusedInput === 'pickupLng' && styles.inputContainerFocused,
+              ]}
+            >
+              <TextInput
+                style={styles.input}
+                placeholder="Longitude"
+                value={pickupLongitude}
+                onChangeText={setPickupLongitude}
+                keyboardType="numeric"
+                placeholderTextColor={colors.textTertiary}
+                onFocus={() => setFocusedInput('pickupLng')}
+                onBlur={() => setFocusedInput(null)}
+              />
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.locationButton}
+            onPress={getCurrentLocation}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.locationButtonIcon}>📍</Text>
+            <Text style={styles.locationButtonText}>Use Current Location</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Dropoff Section */}
+        <Animated.View
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>🎯</Text>
+            <Text style={styles.sectionTitle}>Drop-off Location</Text>
+          </View>
+          <View
+            style={[
+              styles.inputContainer,
+              focusedInput === 'dropoff' && styles.inputContainerFocused,
+            ]}
+          >
+            <TextInput
+              style={styles.input}
+              placeholder="Drop-off Address"
+              value={dropoffAddress}
+              onChangeText={setDropoffAddress}
+              placeholderTextColor={colors.textTertiary}
+              onFocus={() => setFocusedInput('dropoff')}
+              onBlur={() => setFocusedInput(null)}
+            />
+          </View>
+          <View style={styles.coordsRow}>
+            <View
+              style={[
+                styles.inputContainer,
+                styles.coordInput,
+                focusedInput === 'dropoffLat' && styles.inputContainerFocused,
+              ]}
+            >
+              <TextInput
+                style={styles.input}
+                placeholder="Latitude"
+                value={dropoffLatitude}
+                onChangeText={setDropoffLatitude}
+                keyboardType="numeric"
+                placeholderTextColor={colors.textTertiary}
+                onFocus={() => setFocusedInput('dropoffLat')}
+                onBlur={() => setFocusedInput(null)}
+              />
+            </View>
+            <View
+              style={[
+                styles.inputContainer,
+                styles.coordInput,
+                focusedInput === 'dropoffLng' && styles.inputContainerFocused,
+              ]}
+            >
+              <TextInput
+                style={styles.input}
+                placeholder="Longitude"
+                value={dropoffLongitude}
+                onChangeText={setDropoffLongitude}
+                keyboardType="numeric"
+                placeholderTextColor={colors.textTertiary}
+                onFocus={() => setFocusedInput('dropoffLng')}
+                onBlur={() => setFocusedInput(null)}
+              />
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Price Estimate */}
+        {calculatingPrice ? (
+          <View style={styles.priceCard}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.priceCalculating}>Calculating price...</Text>
+          </View>
+        ) : price !== null ? (
+          <Animated.View
+            style={[
+              styles.priceCard,
+              styles.priceCardActive,
+              {
+                opacity: priceAnim,
+                transform: [
+                  {
+                    scale: priceAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.9, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.priceLabel}>Estimated Cost</Text>
+            <Text style={styles.priceValue}>PKR {price.toFixed(0)}</Text>
+            <Text style={styles.priceNote}>
+              Final cost may vary based on exact route and traffic conditions
+            </Text>
+          </Animated.View>
+        ) : null}
+
+        {/* Info Banner */}
+        <Animated.View
+          style={[
+            styles.infoBanner,
+            {
+              opacity: fadeAnim,
+            },
+          ]}
+        >
+          <Text style={styles.infoIcon}>ℹ️</Text>
+          <View style={styles.infoContent}>
+            <Text style={styles.infoText}>
+              Make sure your pickup and drop-off locations are accurate. 
+              The driver will use these coordinates to navigate to you.
+            </Text>
+          </View>
+        </Animated.View>
+
+        {/* Action Buttons */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.bookButton, (loading || !pickupAddress || !dropoffAddress) && styles.bookButtonDisabled]}
+            onPress={handleBook}
+            disabled={loading || !pickupAddress || !dropoffAddress}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={gradients.primary}
+              style={styles.bookButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.white} size="small" />
+              ) : (
+                <>
+                  <Text style={styles.bookButtonText}>Confirm Booking</Text>
+                  <Text style={styles.bookButtonIcon}>✓</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.sosButton}
+            onPress={sendSOS}
+            disabled={sosLoading}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[colors.error, '#DC2626']}
+              style={styles.sosButtonGradient}
+            >
+              {sosLoading ? (
+                <ActivityIndicator color={colors.white} size="small" />
+              ) : (
+                <>
+                  <Text style={styles.sosIcon}>🚨</Text>
+                  <Text style={styles.sosText}>SOS Emergency</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxl,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: spacing.xl,
   },
   errorIcon: {
-    fontSize: 48,
-    marginBottom: 16,
+    fontSize: 64,
+    marginBottom: spacing.lg,
   },
   errorTitle: {
-    fontSize: 20,
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
     fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 8,
   },
   errorText: {
-    fontSize: 14,
-    color: '#6b7280',
+    ...typography.body,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   backButton: {
-    backgroundColor: '#4f46e5',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  backButtonGradient: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
   },
   backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...typography.button,
+    color: colors.white,
+    fontWeight: '700',
   },
   routeHeader: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingTop: 60,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: borderRadius.xl,
+    borderBottomRightRadius: borderRadius.xl,
+  },
+  routeContent: {
+    // Content wrapper
   },
   routeVisual: {
     flexDirection: 'row',
-    gap: 16,
+    gap: spacing.md,
   },
   locationDot: {
     alignItems: 'center',
     width: 24,
   },
   dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4f46e5',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  dotOrigin: {
+    backgroundColor: colors.white,
   },
   line: {
     width: 2,
     flex: 1,
-    backgroundColor: '#e5e7eb',
-    marginVertical: 8,
+    backgroundColor: colors.white,
+    opacity: 0.5,
+    marginVertical: spacing.xs,
   },
   dotDestination: {
-    backgroundColor: '#10b981',
+    backgroundColor: colors.successLight,
   },
   routeText: {
     flex: 1,
   },
   origin: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 4,
+    ...typography.bodyBold,
+    color: colors.white,
+    marginBottom: spacing.xs,
+    fontSize: 18,
   },
   destination: {
-    fontSize: 14,
-    color: '#6b7280',
+    ...typography.body,
+    color: colors.white,
+    opacity: 0.9,
   },
   section: {
-    backgroundColor: '#fff',
-    margin: 16,
-    marginBottom: 0,
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: colors.white,
+    margin: spacing.lg,
+    marginTop: spacing.md,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    ...shadows.md,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  sectionIcon: {
+    fontSize: 24,
   },
   sectionTitle: {
-    fontSize: 16,
+    ...typography.h4,
+    color: colors.textPrimary,
     fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 12,
+  },
+  inputContainer: {
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    minHeight: 56,
+    marginBottom: spacing.md,
+    ...shadows.sm,
+  },
+  inputContainerFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryContainer,
+    ...shadows.md,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
+    ...typography.body,
+    color: colors.textPrimary,
     fontSize: 16,
-    backgroundColor: '#f9fafb',
+    paddingVertical: spacing.sm,
   },
   coordsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: spacing.sm,
   },
   coordInput: {
     flex: 1,
   },
   locationButton: {
-    backgroundColor: '#dbeafe',
-    paddingVertical: 12,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.infoContainer,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    gap: spacing.sm,
     borderWidth: 1,
-    borderColor: '#93c5fd',
+    borderColor: colors.info,
+  },
+  locationButtonIcon: {
+    fontSize: 20,
   },
   locationButtonText: {
-    color: '#1e40af',
-    fontSize: 14,
+    ...typography.smallMedium,
+    color: colors.onInfoContainer,
     fontWeight: '600',
   },
   priceCard: {
-    backgroundColor: '#fff',
-    margin: 16,
-    marginBottom: 0,
-    padding: 20,
-    borderRadius: 16,
+    backgroundColor: colors.white,
+    margin: spacing.lg,
+    marginTop: spacing.md,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
+    ...shadows.md,
+  },
+  priceCardActive: {
     borderWidth: 2,
-    borderColor: '#10b981',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderColor: colors.success,
+    backgroundColor: colors.successContainer,
   },
   priceCalculating: {
-    marginTop: 8,
-    color: '#6b7280',
-    fontSize: 14,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
   },
   priceLabel: {
-    fontSize: 14,
-    color: '#6b7280',
+    ...typography.captionMedium,
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   priceValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#10b981',
-    marginBottom: 4,
+    ...typography.h1,
+    fontSize: 36,
+    color: colors.success,
+    marginBottom: spacing.xs,
+    fontWeight: '800',
   },
   priceNote: {
-    fontSize: 12,
-    color: '#6b7280',
+    ...typography.caption,
+    color: colors.textSecondary,
     textAlign: 'center',
     fontStyle: 'italic',
   },
   infoBanner: {
     flexDirection: 'row',
-    backgroundColor: '#fef3c7',
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: colors.warningContainer,
+    margin: spacing.lg,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
     borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
-    gap: 12,
+    borderLeftColor: colors.warning,
+    gap: spacing.sm,
   },
   infoIcon: {
     fontSize: 24,
@@ -498,51 +730,58 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoText: {
-    fontSize: 13,
-    color: '#92400e',
-    lineHeight: 18,
+    ...typography.small,
+    color: colors.onWarningContainer,
+    lineHeight: 20,
   },
   footer: {
-    padding: 16,
-    paddingBottom: 32,
-    gap: 12,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
   },
   bookButton: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.lg,
+  },
+  bookButtonDisabled: {
+    opacity: 0.5,
+  },
+  bookButtonGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    justifyContent: 'center',
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
   },
   bookButtonText: {
-    color: '#fff',
-    fontSize: 18,
+    ...typography.button,
+    color: colors.white,
     fontWeight: '700',
+    fontSize: 18,
+  },
+  bookButtonIcon: {
+    ...typography.h3,
+    color: colors.white,
   },
   sosButton: {
-    backgroundColor: '#ef4444',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  sosButtonGradient: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
   },
   sosIcon: {
-    fontSize: 20,
+    fontSize: 24,
   },
   sosText: {
-    color: '#fff',
-    fontSize: 16,
+    ...typography.button,
+    color: colors.white,
     fontWeight: '700',
   },
 });

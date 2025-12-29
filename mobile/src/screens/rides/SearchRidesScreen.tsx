@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -7,10 +7,18 @@ import {
   TouchableOpacity, 
   FlatList, 
   ActivityIndicator,
-  ScrollView 
+  ScrollView,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import api from '../../config/api';
+import { colors, typography, spacing, borderRadius, shadows, gradients } from '../../theme';
+
+const { width } = Dimensions.get('window');
 
 interface Trip {
   id: string;
@@ -33,12 +41,40 @@ const SearchRidesScreen = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [womenOnly, setWomenOnly] = useState(false);
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const filterAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   useEffect(() => {
     if (date) {
       search();
     }
   }, []);
+
+  useEffect(() => {
+    Animated.timing(filterAnim, {
+      toValue: showFilters ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [showFilters]);
 
   const search = async () => {
     if (!date) {
@@ -61,155 +97,304 @@ const SearchRidesScreen = () => {
     }
   };
 
-  const renderItem = ({ item }: { item: Trip }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => navigation.navigate('TripDetails' as never, { tripId: item.id } as never)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.routeContainer}>
-          <View style={styles.locationDot}>
-            <View style={styles.dot} />
-            <View style={styles.line} />
-            <View style={[styles.dot, styles.dotDestination]} />
-          </View>
-          <View style={styles.routeText}>
-            <Text style={styles.origin} numberOfLines={1}>{item.origin_address}</Text>
-            <Text style={styles.destination} numberOfLines={1}>{item.destination_address}</Text>
-          </View>
-        </View>
-        {item.is_women_only && (
-          <View style={styles.womenOnlyBadge}>
-            <Text style={styles.womenOnlyText}>👩</Text>
-          </View>
-        )}
-      </View>
+  const renderItem = ({ item, index }: { item: Trip; index: number }) => {
+    const cardAnim = useRef(new Animated.Value(0)).current;
 
-      <View style={styles.cardDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>📅</Text>
-          <Text style={styles.detailText}>
-            {formatDate(item.trip_date)} at {item.trip_time}
-          </Text>
-        </View>
-        {item.total_distance_km && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>📏</Text>
-            <Text style={styles.detailText}>{item.total_distance_km.toFixed(1)} km</Text>
-          </View>
-        )}
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>💺</Text>
-          <Text style={styles.detailText}>
-            {item.available_seats} {item.available_seats === 1 ? 'seat' : 'seats'} available
-          </Text>
-        </View>
-        {item.base_trip_cost && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>💰</Text>
-            <Text style={styles.detailText}>PKR {item.base_trip_cost.toFixed(0)} (full route)</Text>
-          </View>
-        )}
-      </View>
+    React.useEffect(() => {
+      Animated.timing(cardAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 100,
+        useNativeDriver: true,
+      }).start();
+    }, []);
 
-      <View style={styles.cardFooter}>
+    return (
+      <Animated.View
+        style={[
+          styles.cardContainer,
+          {
+            opacity: cardAnim,
+            transform: [
+              {
+                translateY: cardAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [30, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
         <TouchableOpacity
-          style={styles.bookButton}
+          style={styles.card}
           onPress={() => navigation.navigate('TripDetails' as never, { tripId: item.id } as never)}
+          activeOpacity={0.8}
         >
-          <Text style={styles.bookButtonText}>View Details</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+          <View style={styles.cardHeader}>
+            <View style={styles.routeContainer}>
+              <View style={styles.locationDot}>
+                <View style={[styles.dot, styles.dotOrigin]} />
+                <View style={styles.line} />
+                <View style={[styles.dot, styles.dotDestination]} />
+              </View>
+              <View style={styles.routeText}>
+                <Text style={styles.origin} numberOfLines={1}>{item.origin_address}</Text>
+                <Text style={styles.destination} numberOfLines={1}>{item.destination_address}</Text>
+              </View>
+            </View>
+            {item.is_women_only && (
+              <View style={styles.womenOnlyBadge}>
+                <Text style={styles.womenOnlyText}>👩</Text>
+              </View>
+            )}
+          </View>
 
-  return (
-    <View style={styles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <TextInput
-            style={styles.dateInput}
-            placeholder="Date (YYYY-MM-DD)"
-            value={date}
-            onChangeText={setDate}
-            placeholderTextColor="#9ca3af"
-          />
-          <TouchableOpacity style={styles.searchButton} onPress={search}>
-            <Text style={styles.searchButtonText}>🔍</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFilters(!showFilters)}
-        >
-          <Text style={styles.filterButtonText}>
-            {showFilters ? '▲ Hide Filters' : '▼ Show Filters'}
-          </Text>
-        </TouchableOpacity>
-
-        {showFilters && (
-          <View style={styles.filtersContainer}>
-            <TextInput
-              style={styles.filterInput}
-              placeholder="Origin (optional)"
-              value={origin}
-              onChangeText={setOrigin}
-              placeholderTextColor="#9ca3af"
-            />
-            <TextInput
-              style={styles.filterInput}
-              placeholder="Destination (optional)"
-              value={destination}
-              onChangeText={setDestination}
-              placeholderTextColor="#9ca3af"
-            />
-            <TouchableOpacity
-              style={[styles.checkbox, womenOnly && styles.checkboxActive]}
-              onPress={() => setWomenOnly(!womenOnly)}
-            >
-              <Text style={styles.checkboxText}>
-                {womenOnly ? '☑️' : '☐'} Women-only rides
+          <View style={styles.cardDetails}>
+            <View style={styles.detailRow}>
+              <View style={styles.detailIcon}>
+                <Text style={styles.detailIconText}>📅</Text>
+              </View>
+              <Text style={styles.detailText}>
+                {formatDate(item.trip_date)} at {item.trip_time}
               </Text>
+            </View>
+            {item.total_distance_km && (
+              <View style={styles.detailRow}>
+                <View style={styles.detailIcon}>
+                  <Text style={styles.detailIconText}>📏</Text>
+                </View>
+                <Text style={styles.detailText}>{item.total_distance_km.toFixed(1)} km</Text>
+              </View>
+            )}
+            <View style={styles.detailRow}>
+              <View style={styles.detailIcon}>
+                <Text style={styles.detailIconText}>💺</Text>
+              </View>
+              <Text style={styles.detailText}>
+                {item.available_seats} {item.available_seats === 1 ? 'seat' : 'seats'} available
+              </Text>
+            </View>
+            {item.base_trip_cost && (
+              <View style={styles.detailRow}>
+                <View style={styles.detailIcon}>
+                  <Text style={styles.detailIconText}>💰</Text>
+                </View>
+                <Text style={styles.detailText}>PKR {item.base_trip_cost.toFixed(0)}</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.cardFooter}>
+            <TouchableOpacity
+              style={styles.bookButton}
+              onPress={() => navigation.navigate('TripDetails' as never, { tripId: item.id } as never)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={gradients.primary}
+                style={styles.bookButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.bookButtonText}>View Details</Text>
+                <Text style={styles.bookButtonArrow}>→</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
-        )}
-      </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
-      {/* Results */}
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#4f46e5" />
-          <Text style={styles.loadingText}>Searching rides...</Text>
-        </View>
-      ) : trips.length === 0 ? (
-        <ScrollView contentContainerStyle={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>🚗</Text>
-          <Text style={styles.emptyTitle}>No rides found</Text>
-          <Text style={styles.emptyText}>
-            Try adjusting your search filters or check back later
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={search}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
+  const filterHeight = filterAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 200],
+  });
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <LinearGradient
+        colors={gradients.primary}
+        style={styles.header}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <Animated.View
+          style={[
+            styles.headerContent,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <Text style={styles.headerTitle}>Find Your Ride</Text>
+          <Text style={styles.headerSubtitle}>Search for available trips</Text>
+        </Animated.View>
+      </LinearGradient>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Search Bar */}
+        <Animated.View
+          style={[
+            styles.searchContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.searchBar}>
+            <View
+              style={[
+                styles.inputContainer,
+                focusedInput === 'date' && styles.inputContainerFocused,
+              ]}
+            >
+              <Text style={styles.inputIcon}>📅</Text>
+              <TextInput
+                style={styles.dateInput}
+                placeholder="Date (YYYY-MM-DD)"
+                value={date}
+                onChangeText={setDate}
+                placeholderTextColor={colors.textTertiary}
+                onFocus={() => setFocusedInput('date')}
+                onBlur={() => setFocusedInput(null)}
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.searchButton}
+              onPress={search}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={gradients.primary}
+                style={styles.searchButtonGradient}
+              >
+                <Text style={styles.searchButtonText}>🔍</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowFilters(!showFilters)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.filterButtonText}>
+              {showFilters ? '▲ Hide Filters' : '▼ Show Filters'}
+            </Text>
           </TouchableOpacity>
-        </ScrollView>
-      ) : (
-        <FlatList
-          data={trips}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
+
+          <Animated.View
+            style={[
+              styles.filtersContainer,
+              {
+                maxHeight: filterHeight,
+                opacity: filterAnim,
+              },
+            ]}
+          >
+            <View style={styles.filtersContent}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  focusedInput === 'origin' && styles.inputContainerFocused,
+                ]}
+              >
+                <Text style={styles.inputIcon}>📍</Text>
+                <TextInput
+                  style={styles.filterInput}
+                  placeholder="Origin (optional)"
+                  value={origin}
+                  onChangeText={setOrigin}
+                  placeholderTextColor={colors.textTertiary}
+                  onFocus={() => setFocusedInput('origin')}
+                  onBlur={() => setFocusedInput(null)}
+                />
+              </View>
+              <View
+                style={[
+                  styles.inputContainer,
+                  focusedInput === 'destination' && styles.inputContainerFocused,
+                ]}
+              >
+                <Text style={styles.inputIcon}>🎯</Text>
+                <TextInput
+                  style={styles.filterInput}
+                  placeholder="Destination (optional)"
+                  value={destination}
+                  onChangeText={setDestination}
+                  placeholderTextColor={colors.textTertiary}
+                  onFocus={() => setFocusedInput('destination')}
+                  onBlur={() => setFocusedInput(null)}
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.checkbox, womenOnly && styles.checkboxActive]}
+                onPress={() => setWomenOnly(!womenOnly)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.checkboxBox, womenOnly && styles.checkboxBoxActive]}>
+                  {womenOnly && <Text style={styles.checkboxCheck}>✓</Text>}
+                </View>
+                <Text style={styles.checkboxText}>Women-only rides</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
+
+        {/* Results */}
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Searching rides...</Text>
+          </View>
+        ) : trips.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>🚗</Text>
+            <Text style={styles.emptyTitle}>No rides found</Text>
+            <Text style={styles.emptyText}>
+              Try adjusting your search filters or check back later
+            </Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={search}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={gradients.primary}
+                style={styles.retryButtonGradient}
+              >
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.resultsContainer}>
             <Text style={styles.resultsHeader}>
               Found {trips.length} {trips.length === 1 ? 'ride' : 'rides'}
             </Text>
-          }
-        />
-      )}
-    </View>
+            <FlatList
+              data={trips}
+              keyExtractor={(item) => item.id}
+              renderItem={renderItem}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -230,220 +415,309 @@ const formatDate = (dateString: string) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.background,
+  },
+  header: {
+    paddingTop: 60,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: borderRadius.xl,
+    borderBottomRightRadius: borderRadius.xl,
+  },
+  headerContent: {
+    alignItems: 'center',
+  },
+  headerTitle: {
+    ...typography.h1,
+    fontSize: 28,
+    color: colors.white,
+    marginBottom: spacing.xs,
+    fontWeight: '800',
+  },
+  headerSubtitle: {
+    ...typography.body,
+    color: colors.white,
+    opacity: 0.95,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxl,
   },
   searchContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    backgroundColor: colors.white,
+    margin: spacing.lg,
+    marginTop: -spacing.lg,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    ...shadows.lg,
   },
   searchBar: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  inputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    minHeight: 56,
+    ...shadows.sm,
+  },
+  inputContainerFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryContainer,
+    ...shadows.md,
+  },
+  inputIcon: {
+    fontSize: 20,
+    marginRight: spacing.sm,
   },
   dateInput: {
+    ...typography.body,
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    color: colors.textPrimary,
     fontSize: 16,
-    backgroundColor: '#f9fafb',
   },
   searchButton: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 12,
-    width: 50,
-    height: 50,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  searchButtonGradient: {
+    width: 56,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchButtonText: {
-    fontSize: 20,
+    fontSize: 24,
   },
   filterButton: {
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
   },
   filterButtonText: {
-    color: '#4f46e5',
-    fontSize: 14,
+    ...typography.smallMedium,
+    color: colors.primary,
     fontWeight: '600',
   },
   filtersContainer: {
-    marginTop: 12,
-    gap: 12,
+    overflow: 'hidden',
+  },
+  filtersContent: {
+    gap: spacing.md,
+    paddingTop: spacing.md,
   },
   filterInput: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    ...typography.body,
+    flex: 1,
+    color: colors.textPrimary,
     fontSize: 16,
-    backgroundColor: '#f9fafb',
   },
   checkbox: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
   },
   checkboxActive: {
-    // Add active state styling if needed
+    // Active state handled by checkboxBoxActive
+  },
+  checkboxBox: {
+    width: 24,
+    height: 24,
+    borderRadius: borderRadius.sm,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  checkboxBoxActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkboxCheck: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '700',
   },
   checkboxText: {
-    fontSize: 16,
-    color: '#1f2937',
+    ...typography.body,
+    color: colors.textPrimary,
   },
-  list: {
-    padding: 16,
+  resultsContainer: {
+    paddingHorizontal: spacing.lg,
   },
   resultsHeader: {
-    fontSize: 18,
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
     fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 16,
+  },
+  cardContainer: {
+    marginBottom: spacing.md,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    ...shadows.md,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   routeContainer: {
     flexDirection: 'row',
     flex: 1,
-    gap: 12,
+    gap: spacing.md,
   },
   locationDot: {
     alignItems: 'center',
     width: 24,
   },
   dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4f46e5',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  dotOrigin: {
+    backgroundColor: colors.primary,
   },
   line: {
     width: 2,
     flex: 1,
-    backgroundColor: '#e5e7eb',
-    marginVertical: 4,
+    backgroundColor: colors.border,
+    marginVertical: spacing.xs,
   },
   dotDestination: {
-    backgroundColor: '#10b981',
+    backgroundColor: colors.success,
   },
   routeText: {
     flex: 1,
   },
   origin: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 4,
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
   destination: {
-    fontSize: 14,
-    color: '#6b7280',
+    ...typography.small,
+    color: colors.textSecondary,
   },
   womenOnlyBadge: {
-    backgroundColor: '#fce7f3',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: colors.warningContainer,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   womenOnlyText: {
-    fontSize: 16,
+    fontSize: 18,
   },
   cardDetails: {
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
-  detailLabel: {
-    fontSize: 16,
-    width: 24,
+  detailIcon: {
+    width: 28,
+    alignItems: 'center',
+  },
+  detailIconText: {
+    fontSize: 18,
   },
   detailText: {
-    fontSize: 14,
-    color: '#6b7280',
+    ...typography.small,
+    color: colors.textSecondary,
   },
   cardFooter: {
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingTop: 12,
+    borderTopColor: colors.border,
+    paddingTop: spacing.md,
   },
   bookButton: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.sm,
+  },
+  bookButtonGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
   },
   bookButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...typography.button,
+    color: colors.white,
+    fontWeight: '700',
+  },
+  bookButtonArrow: {
+    ...typography.bodyBold,
+    color: colors.white,
+    fontSize: 18,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.xxl,
   },
   loadingText: {
-    marginTop: 12,
-    color: '#6b7280',
-    fontSize: 14,
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: spacing.xxl,
+    minHeight: 400,
   },
   emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: 80,
+    marginBottom: spacing.lg,
   },
   emptyTitle: {
-    fontSize: 20,
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
     fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 8,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#6b7280',
+    ...typography.body,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   retryButton: {
-    backgroundColor: '#4f46e5',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.md,
+  },
+  retryButtonGradient: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
   },
   retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...typography.button,
+    color: colors.white,
+    fontWeight: '700',
   },
 });
 
