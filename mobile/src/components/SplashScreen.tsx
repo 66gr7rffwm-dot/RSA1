@@ -47,17 +47,15 @@ const CustomSplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           }),
         ]).start();
 
-        // Show splash for 3 seconds
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Show splash for 2.5 seconds (same as error screen)
+        await new Promise(resolve => setTimeout(resolve, 2500));
       } catch (e) {
         console.warn(e);
       } finally {
-        // Hide native splash screen
+        // Hide native splash screen immediately
         await SplashScreen.hideAsync();
-        // Call onFinish after a brief delay
-        setTimeout(() => {
-          onFinish();
-        }, 500);
+        // Call onFinish immediately
+        onFinish();
       }
     };
 
@@ -70,8 +68,8 @@ const CustomSplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     day: 'numeric',
   });
 
-  const buildVersion = '1.0.1';
-  const buildNumber = '2';
+  const buildVersion = '1.0.3';
+  const buildNumber = '4';
 
   const rotate = rotateAnim.interpolate({
     inputRange: [0, 1],

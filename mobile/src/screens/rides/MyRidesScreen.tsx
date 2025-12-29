@@ -92,12 +92,18 @@ const MyRidesScreen = () => {
   }, [user]);
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+    try {
+      if (!dateString) return 'Date not set';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid date';
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    } catch (e) {
+      return 'Date error';
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -116,78 +122,92 @@ const MyRidesScreen = () => {
     }
   };
 
-  const renderItem = ({ item }: { item: Trip }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.routeContainer}>
-          <View style={styles.locationDot}>
-            <View style={[styles.dot, styles.dotOrigin]} />
-            <View style={styles.line} />
-            <View style={[styles.dot, styles.dotDestination]} />
-          </View>
-          <View style={styles.routeText}>
-            <Text style={styles.origin} numberOfLines={1}>{item.origin_address}</Text>
-            <Text style={styles.destination} numberOfLines={1}>{item.destination_address}</Text>
-          </View>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status}</Text>
-        </View>
-      </View>
+  const renderItem = ({ item }: { item: Trip }) => {
+    // Safe accessor functions to prevent undefined errors
+    const safeNumber = (val: any, decimals: number = 0): string => {
+      if (val === null || val === undefined || isNaN(Number(val))) return '0';
+      return Number(val).toFixed(decimals);
+    };
 
-      <View style={styles.cardDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailIcon}>📅</Text>
-          <Text style={styles.detailText}>
-            {formatDate(item.trip_date)} at {item.trip_time}
-          </Text>
+    const status = item?.status || 'pending';
+    const originAddress = item?.origin_address || 'Origin not set';
+    const destinationAddress = item?.destination_address || 'Destination not set';
+    const tripTime = item?.trip_time || '--:--';
+    const maxSeats = item?.max_seats || 0;
+    const availableSeats = item?.available_seats ?? 0;
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.routeContainer}>
+            <View style={styles.locationDot}>
+              <View style={[styles.dot, styles.dotOrigin]} />
+              <View style={styles.line} />
+              <View style={[styles.dot, styles.dotDestination]} />
+            </View>
+            <View style={styles.routeText}>
+              <Text style={styles.origin} numberOfLines={1}>{originAddress}</Text>
+              <Text style={styles.destination} numberOfLines={1}>{destinationAddress}</Text>
+            </View>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}>
+            <Text style={styles.statusText}>{status}</Text>
+          </View>
         </View>
-        {item.total_distance_km && (
+
+        <View style={styles.cardDetails}>
           <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>📏</Text>
-            <Text style={styles.detailText}>{item.total_distance_km.toFixed(1)} km</Text>
-          </View>
-        )}
-        {typeof item.available_seats === 'number' && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>💺</Text>
+            <Text style={styles.detailIcon}>📅</Text>
             <Text style={styles.detailText}>
-              {item.available_seats}/{item.max_seats} seats
+              {formatDate(item?.trip_date)} at {tripTime}
             </Text>
           </View>
-        )}
-        {user?.role === 'driver' && (item.earnings || item.total_earnings) && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>💰</Text>
-            <Text style={[styles.detailText, styles.earningsText]}>
-              Earnings: PKR {(item.earnings || item.total_earnings || 0).toFixed(0)}
-            </Text>
-          </View>
-        )}
-        {user?.role === 'passenger' && item.base_trip_cost && (
-          <View style={styles.detailRow}>
-            <Text style={styles.detailIcon}>💰</Text>
-            <Text style={styles.detailText}>
-              Cost: PKR {item.base_trip_cost.toFixed(0)}
-            </Text>
-          </View>
+          {item?.total_distance_km != null && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailIcon}>📏</Text>
+              <Text style={styles.detailText}>{safeNumber(item.total_distance_km, 1)} km</Text>
+            </View>
+          )}
+          {maxSeats > 0 && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailIcon}>💺</Text>
+              <Text style={styles.detailText}>
+                {availableSeats}/{maxSeats} seats
+              </Text>
+            </View>
+          )}
+          {user?.role === 'driver' && (item?.earnings || item?.total_earnings) && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailIcon}>💰</Text>
+              <Text style={[styles.detailText, styles.earningsText]}>
+                Earnings: PKR {safeNumber(item.earnings || item.total_earnings, 0)}
+              </Text>
+            </View>
+          )}
+          {user?.role === 'passenger' && item?.base_trip_cost != null && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailIcon}>💰</Text>
+              <Text style={styles.detailText}>
+                Cost: PKR {safeNumber(item.base_trip_cost, 0)}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {user?.role === 'passenger' && item?.bookingId && (
+          <TouchableOpacity
+            style={styles.rateButton}
+            onPress={() => {
+              Alert.alert('Rate Ride', 'Rating feature coming soon!');
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.rateText}>Rate Ride</Text>
+          </TouchableOpacity>
         )}
       </View>
-
-      {user?.role === 'passenger' && item.bookingId && (
-        <TouchableOpacity
-          style={styles.rateButton}
-          onPress={() => {
-            // Rating functionality
-            Alert.alert('Rate Ride', 'Rating feature coming soon!');
-          }}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.rateText}>Rate Ride</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -212,19 +232,19 @@ const MyRidesScreen = () => {
             <Text style={styles.statsTitle}>📊 Driver Statistics</Text>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>PKR {driverStats.totalEarnings.toFixed(0)}</Text>
+                <Text style={styles.statValue}>PKR {(driverStats.totalEarnings || 0).toFixed(0)}</Text>
                 <Text style={styles.statLabel}>Total Earnings</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{driverStats.totalTrips}</Text>
+                <Text style={styles.statValue}>{driverStats.totalTrips || 0}</Text>
                 <Text style={styles.statLabel}>Total Trips</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{driverStats.completedTrips}</Text>
+                <Text style={styles.statValue}>{driverStats.completedTrips || 0}</Text>
                 <Text style={styles.statLabel}>Completed</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{driverStats.activeTrips}</Text>
+                <Text style={styles.statValue}>{driverStats.activeTrips || 0}</Text>
                 <Text style={styles.statLabel}>Active</Text>
               </View>
             </View>
