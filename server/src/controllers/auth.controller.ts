@@ -157,49 +157,75 @@ export const verifyOTP = async (req: Request, res: Response, next: NextFunction)
   try {
     const { phoneNumber, otpCode } = req.body;
 
-    // Find OTP record
-    const otpResult = await pool.query(
-      `SELECT id, otp_code, expires_at, is_used 
-       FROM otp_verifications 
-       WHERE phone_number = $1 
-       AND is_used = FALSE 
-       ORDER BY created_at DESC 
-       LIMIT 1`,
-      [phoneNumber]
-    );
+    // Development bypass: Allow "000000" as universal OTP in development
+    const isDevMode = process.env.NODE_ENV !== 'production';
+    if (isDevMode && otpCode === '000000') {
+      // Find the latest OTP for this phone number (even if expired/used)
+      const otpResult = await pool.query(
+        `SELECT id FROM otp_verifications 
+         WHERE phone_number = $1 
+         ORDER BY created_at DESC 
+         LIMIT 1`,
+        [phoneNumber]
+      );
 
-    if (otpResult.rows.length === 0) {
-      res.status(400).json({
-        success: false,
-        error: 'No OTP found or already used',
-      });
-      return;
+      if (otpResult.rows.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: 'No OTP found. Please register first.',
+        });
+        return;
+      }
+
+      // Mark as used if not already
+      await pool.query('UPDATE otp_verifications SET is_used = TRUE WHERE id = $1', [
+        otpResult.rows[0].id,
+      ]);
+    } else {
+      // Normal OTP verification
+      const otpResult = await pool.query(
+        `SELECT id, otp_code, expires_at, is_used 
+         FROM otp_verifications 
+         WHERE phone_number = $1 
+         AND is_used = FALSE 
+         ORDER BY created_at DESC 
+         LIMIT 1`,
+        [phoneNumber]
+      );
+
+      if (otpResult.rows.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: 'No OTP found or already used',
+        });
+        return;
+      }
+
+      const otpRecord = otpResult.rows[0];
+
+      // Check if expired
+      if (new Date() > new Date(otpRecord.expires_at)) {
+        res.status(400).json({
+          success: false,
+          error: 'OTP has expired',
+        });
+        return;
+      }
+
+      // Verify OTP
+      if (otpRecord.otp_code !== otpCode) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid OTP code',
+        });
+        return;
+      }
+
+      // Mark OTP as used
+      await pool.query('UPDATE otp_verifications SET is_used = TRUE WHERE id = $1', [
+        otpRecord.id,
+      ]);
     }
-
-    const otpRecord = otpResult.rows[0];
-
-    // Check if expired
-    if (new Date() > new Date(otpRecord.expires_at)) {
-      res.status(400).json({
-        success: false,
-        error: 'OTP has expired',
-      });
-      return;
-    }
-
-    // Verify OTP
-    if (otpRecord.otp_code !== otpCode) {
-      res.status(400).json({
-        success: false,
-        error: 'Invalid OTP code',
-      });
-      return;
-    }
-
-    // Mark OTP as used
-    await pool.query('UPDATE otp_verifications SET is_used = TRUE WHERE id = $1', [
-      otpRecord.id,
-    ]);
 
     // Update user verification status
     await pool.query('UPDATE users SET is_verified = TRUE WHERE phone_number = $1', [

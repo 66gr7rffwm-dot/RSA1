@@ -41,6 +41,10 @@ const UsersPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  const [showEditUser, setShowEditUser] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<{ id: string; name: string } | null>(null);
   const [showRoles, setShowRoles] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
@@ -145,12 +149,22 @@ const UsersPage: React.FC = () => {
   };
 
   const toggleUserStatus = async (userId: string, isActive: boolean) => {
+    console.log('Toggle user status clicked:', { userId, isActive });
     try {
-      await api.put(`/admin/users/${userId}/status`, { is_active: !isActive });
+      const response = await api.put(`/admin/users/${userId}/status`, { is_active: !isActive });
+      console.log('Toggle status response:', response.data);
       toast.success(`User ${!isActive ? 'activated' : 'deactivated'}`);
       await loadUsers();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update user status');
+      console.error('Toggle status error:', error);
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to update user status';
+      toast.error(errorMsg);
+      console.error('Toggle Status Error Details:', {
+        userId,
+        isActive,
+        error: error.response?.data || error.message,
+        status: error.response?.status
+      });
     }
   };
 
@@ -193,6 +207,139 @@ const UsersPage: React.FC = () => {
     }
   };
 
+  const handleDeleteClick = (user: User) => {
+    console.log('Delete button clicked for user:', user);
+    if (user.role === 'admin') {
+      toast.error('Cannot delete admin users');
+      return;
+    }
+    setUserToDelete({ id: user.id, name: user.full_name });
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+    
+    const { id, name } = userToDelete;
+    console.log('Confirming delete for user:', { id, name });
+    
+    try {
+      console.log('Sending delete request to:', `/admin/users/${id}`);
+      const response = await api.delete(`/admin/users/${id}`);
+      console.log('Delete response:', response);
+      console.log('Delete response data:', response.data);
+      
+      toast.success(`User "${name}" deleted successfully`);
+      setShowDeleteConfirm(false);
+      setUserToDelete(null);
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      console.error('Delete error response:', error.response);
+      console.error('Delete error data:', error.response?.data);
+      
+      const errorMsg = error.response?.data?.error || 
+                      error.response?.data?.message || 
+                      error.message || 
+                      'Failed to delete user';
+      
+      toast.error(errorMsg);
+      
+      console.error('Delete Error Details:', {
+        userId: id,
+        userName: name,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        url: error.config?.url,
+        method: error.config?.method
+      });
+      
+      // Don't close modal on error so user can try again
+    }
+  };
+
+  const cancelDelete = () => {
+    console.log('Delete cancelled');
+    setShowDeleteConfirm(false);
+    setUserToDelete(null);
+  };
+
+  const [viewingOTP, setViewingOTP] = useState<{ [key: string]: string | null }>({});
+  const [loadingOTP, setLoadingOTP] = useState<{ [key: string]: boolean }>({});
+
+  const viewOTP = async (phoneNumber: string, userId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+
+    // Toggle hide/show
+    if (viewingOTP[userId]) {
+      setViewingOTP({ ...viewingOTP, [userId]: null });
+      return;
+    }
+
+    setLoadingOTP({ ...loadingOTP, [userId]: true });
+    try {
+      // Encode phone number for URL (handle + and special characters)
+      const encodedPhone = encodeURIComponent(phoneNumber);
+      const res = await api.get(`/admin/users/otp/${encodedPhone}`);
+      
+      if (res.data.success && res.data.data) {
+        const otp = res.data.data;
+        setViewingOTP({ ...viewingOTP, [userId]: otp.otpCode });
+        if (otp.isValid) {
+          toast.success('OTP retrieved successfully');
+        } else {
+          toast.error('OTP expired or already used');
+        }
+      } else {
+        toast.error('No OTP found for this user');
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to get OTP';
+      toast.error(errorMsg);
+      console.error('OTP Error Details:', {
+        phoneNumber,
+        userId,
+        error: error.response?.data || error.message,
+        url: `/admin/users/otp/${encodeURIComponent(phoneNumber)}`
+      });
+    } finally {
+      setLoadingOTP({ ...loadingOTP, [userId]: false });
+    }
+  };
+
+  const handleEditUser = (user: User) => {
+    console.log('Edit user clicked:', user);
+    setEditingUser({ ...user }); // Create a copy to avoid direct mutation
+    setShowEditUser(true);
+  };
+
+  const updateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    try {
+      const updateData: any = {};
+      if (editingUser.full_name) updateData.full_name = editingUser.full_name;
+      if (editingUser.email !== undefined) updateData.email = editingUser.email;
+      if (editingUser.phone_number) updateData.phone_number = editingUser.phone_number;
+      if (editingUser.role) updateData.role = editingUser.role;
+      updateData.is_active = editingUser.is_active;
+      updateData.is_verified = editingUser.is_verified;
+
+      await api.put(`/admin/users/${editingUser.id}`, updateData);
+      toast.success('User updated successfully');
+      setShowEditUser(false);
+      setEditingUser(null);
+      await loadUsers();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update user');
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
@@ -231,40 +378,193 @@ const UsersPage: React.FC = () => {
   }
 
   return (
-    <div>
-      <div className="page-header">
+    <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
+      <div className="page-header" style={{ 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '32px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        color: 'white'
+      }}>
         <div>
-          <h2>User Management</h2>
-          <p className="subtitle">Manage users, roles, and permissions</p>
+          <h2 style={{ margin: 0, fontSize: '28px', fontWeight: '700', color: 'white' }}>👥 User Management</h2>
+          <p className="subtitle" style={{ margin: '8px 0 0 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '16px' }}>
+            Manage users, roles, and permissions
+          </p>
         </div>
-        <div className="header-actions">
-          <button className="btn-secondary" onClick={load}>
+        <div className="header-actions" style={{ display: 'flex', gap: '12px' }}>
+          <button 
+            className="btn-secondary" 
+            onClick={load}
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              color: 'white',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+          >
             🔄 Refresh
           </button>
           {activeTab === 'users' && (
-            <button className="btn-primary" onClick={() => setShowCreateUser(true)}>
+            <button 
+              className="btn-primary" 
+              onClick={() => setShowCreateUser(true)}
+              style={{
+                background: 'white',
+                color: '#667eea',
+                border: 'none',
+                padding: '10px 24px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '15px',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+              }}
+            >
               ➕ Create User
             </button>
           )}
           {activeTab === 'roles' && (
-            <button className="btn-primary" onClick={() => setShowRoles(true)}>
+            <button 
+              className="btn-primary" 
+              onClick={() => setShowRoles(true)}
+              style={{
+                background: 'white',
+                color: '#667eea',
+                border: 'none',
+                padding: '10px 24px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '15px',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+              }}
+            >
               ➕ Create Role
             </button>
           )}
         </div>
       </div>
 
+      {/* Stats Cards */}
+      {activeTab === 'users' && (
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '16px',
+          marginBottom: '24px'
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '20px',
+            borderRadius: '12px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>Total Users</div>
+            <div style={{ fontSize: '32px', fontWeight: '700', color: '#1e293b' }}>{stats.total}</div>
+          </div>
+          <div style={{
+            background: 'white',
+            padding: '20px',
+            borderRadius: '12px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>🚗 Drivers</div>
+            <div style={{ fontSize: '32px', fontWeight: '700', color: '#10b981' }}>{stats.drivers}</div>
+          </div>
+          <div style={{
+            background: 'white',
+            padding: '20px',
+            borderRadius: '12px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>👤 Passengers</div>
+            <div style={{ fontSize: '32px', fontWeight: '700', color: '#3b82f6' }}>{stats.passengers}</div>
+          </div>
+          <div style={{
+            background: 'white',
+            padding: '20px',
+            borderRadius: '12px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>✅ Active</div>
+            <div style={{ fontSize: '32px', fontWeight: '700', color: '#10b981' }}>{stats.active}</div>
+          </div>
+          <div style={{
+            background: 'white',
+            padding: '20px',
+            borderRadius: '12px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>✓ Verified</div>
+            <div style={{ fontSize: '32px', fontWeight: '700', color: '#10b981' }}>{stats.verified}</div>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
-      <div className="tab-navigation">
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        marginBottom: '24px',
+        background: 'white',
+        padding: '8px',
+        borderRadius: '12px',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+        border: '1px solid #e2e8f0'
+      }}>
         <button
-          className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
           onClick={() => setActiveTab('users')}
+          style={{
+            flex: 1,
+            padding: '12px 24px',
+            borderRadius: '8px',
+            border: 'none',
+            background: activeTab === 'users' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+            color: activeTab === 'users' ? 'white' : '#64748b',
+            fontWeight: activeTab === 'users' ? '600' : '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            fontSize: '15px'
+          }}
         >
           👥 Users ({stats.total})
         </button>
         <button
-          className={`tab-button ${activeTab === 'roles' ? 'active' : ''}`}
           onClick={() => setActiveTab('roles')}
+          style={{
+            flex: 1,
+            padding: '12px 24px',
+            borderRadius: '8px',
+            border: 'none',
+            background: activeTab === 'roles' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+            color: activeTab === 'roles' ? 'white' : '#64748b',
+            fontWeight: activeTab === 'roles' ? '600' : '500',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            fontSize: '15px'
+          }}
         >
           🛡️ Roles & Permissions ({roles.length})
         </button>
@@ -273,124 +573,430 @@ const UsersPage: React.FC = () => {
       {/* Users Tab */}
       {activeTab === 'users' && (
         <>
-          {/* Stats Cards */}
-          <div className="stats-cards">
-            <div className="stat-card">
-              <div className="stat-value">{stats.total}</div>
-              <div className="stat-label">Total Users</div>
-            </div>
-            <div className="stat-card stat-success">
-              <div className="stat-value">{stats.drivers}</div>
-              <div className="stat-label">Drivers</div>
-            </div>
-            <div className="stat-card stat-info">
-              <div className="stat-value">{stats.passengers}</div>
-              <div className="stat-label">Passengers</div>
-            </div>
-            <div className="stat-card stat-primary">
-              <div className="stat-value">{stats.admins}</div>
-              <div className="stat-label">Admins</div>
-            </div>
-            <div className="stat-card stat-warning">
-              <div className="stat-value">{stats.active}</div>
-              <div className="stat-label">Active</div>
-            </div>
-            <div className="stat-card stat-primary">
-              <div className="stat-value">{stats.verified}</div>
-              <div className="stat-label">Verified</div>
-            </div>
-          </div>
-
           {/* Filters */}
-          <div className="filters-bar">
-            <div className="search-group">
+          <div style={{
+            background: 'white',
+            padding: '20px',
+            borderRadius: '12px',
+            marginBottom: '24px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+            border: '1px solid #e2e8f0',
+            display: 'flex',
+            gap: '16px',
+            alignItems: 'center',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ flex: 1, minWidth: '300px' }}>
               <input
                 type="text"
-                placeholder="Search by name, phone, or email..."
+                placeholder="🔍 Search by name, phone, or email..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="search-input"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '14px',
+                  transition: 'all 0.2s',
+                  outline: 'none'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#667eea'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
               />
             </div>
-            <div className="filter-group">
-              <label>Filter:</label>
-              <select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="filter-select">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ fontSize: '14px', fontWeight: '500', color: '#64748b' }}>Filter:</label>
+              <select 
+                value={filter} 
+                onChange={(e) => setFilter(e.target.value as any)} 
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '14px',
+                  background: 'white',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  minWidth: '150px'
+                }}
+              >
                 <option value="all">All Users</option>
-                <option value="drivers">Drivers</option>
-                <option value="passengers">Passengers</option>
-                <option value="admins">Admins</option>
+                <option value="drivers">🚗 Drivers</option>
+                <option value="passengers">👤 Passengers</option>
+                <option value="admins">👑 Admins</option>
               </select>
             </div>
           </div>
 
           {/* Users Table */}
-          <div className="table-container">
-            <table className="table">
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+            border: '1px solid #e2e8f0',
+            overflow: 'hidden'
+          }}>
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse'
+            }}>
               <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Contact</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Verified</th>
-                  <th>Joined</th>
-                  <th>Actions</th>
+                <tr style={{
+                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                  borderBottom: '2px solid #e2e8f0'
+                }}>
+                  <th style={{
+                    padding: '16px',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    color: '#475569',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>User</th>
+                  <th style={{
+                    padding: '16px',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    color: '#475569',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Contact</th>
+                  <th style={{
+                    padding: '16px',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    color: '#475569',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Role</th>
+                  <th style={{
+                    padding: '16px',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    color: '#475569',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Status</th>
+                  <th style={{
+                    padding: '16px',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    color: '#475569',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Verified</th>
+                  <th style={{
+                    padding: '16px',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    color: '#475569',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Joined</th>
+                  <th style={{
+                    padding: '16px',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    color: '#475569',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="empty-state">
-                      {search ? 'No users match your search' : 'No users found'}
+                    <td colSpan={7} style={{
+                      padding: '48px',
+                      textAlign: 'center',
+                      color: '#94a3b8',
+                      fontSize: '16px'
+                    }}>
+                      {search ? '🔍 No users match your search' : '👥 No users found'}
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((user) => (
-                    <tr key={user.id}>
-                      <td>
-                        <div className="user-info">
-                          <strong>{user.full_name}</strong>
-                          <div className="user-id">ID: {user.id.substring(0, 8)}...</div>
+                  filteredUsers.map((user, index) => (
+                    <tr 
+                      key={user.id}
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        transition: 'all 0.2s',
+                        cursor: 'default'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'white';
+                      }}
+                    >
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <strong style={{ fontSize: '15px', color: '#1e293b', fontWeight: '600' }}>
+                            {user.full_name}
+                          </strong>
+                          <div style={{ fontSize: '12px', color: '#94a3b8', fontFamily: 'monospace' }}>
+                            ID: {user.id.substring(0, 8)}...
+                          </div>
                         </div>
                       </td>
                       <td>
-                        <div>{user.phone_number}</div>
-                        {user.email && <div className="user-email">{user.email}</div>}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span>{user.phone_number}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                viewOTP(user.phone_number, user.id, e);
+                              }}
+                              disabled={loadingOTP[user.id]}
+                              title="View OTP (Development Only) - Click to toggle"
+                              style={{
+                                background: viewingOTP[user.id] ? '#dbeafe' : '#f1f5f9',
+                                border: viewingOTP[user.id] ? '1px solid #3b82f6' : '1px solid #cbd5e1',
+                                borderRadius: '4px',
+                                cursor: loadingOTP[user.id] ? 'not-allowed' : 'pointer',
+                                padding: '4px 10px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                opacity: loadingOTP[user.id] ? 0.6 : 1,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                minWidth: '75px',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s ease',
+                                color: viewingOTP[user.id] ? '#1e40af' : '#475569'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!loadingOTP[user.id]) {
+                                  e.currentTarget.style.background = viewingOTP[user.id] ? '#bfdbfe' : '#e2e8f0';
+                                  e.currentTarget.style.transform = 'scale(1.05)';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!loadingOTP[user.id]) {
+                                  e.currentTarget.style.background = viewingOTP[user.id] ? '#dbeafe' : '#f1f5f9';
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                }
+                              }}
+                            >
+                              {loadingOTP[user.id] ? (
+                                <span>⏳ Loading...</span>
+                              ) : viewingOTP[user.id] ? (
+                                <span>👁️ Hide OTP</span>
+                              ) : (
+                                <span>👁️‍🗨️ View OTP</span>
+                              )}
+                            </button>
+                          </div>
+                          {viewingOTP[user.id] && (
+                            <div style={{
+                              padding: '6px 8px',
+                              background: '#dcfce7',
+                              border: '1px solid #86efac',
+                              borderRadius: '4px',
+                              fontFamily: 'monospace',
+                              fontSize: '13px',
+                              fontWeight: 'bold',
+                              color: '#166534',
+                              marginTop: '4px'
+                            }}>
+                              🔐 OTP: {viewingOTP[user.id]}
+                            </div>
+                          )}
+                          {user.email && <div className="user-email" style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>{user.email}</div>}
+                        </div>
                       </td>
-                      <td>
-                        <span className={`badge badge-${
-                          user.role === 'admin' ? 'info' : 
-                          user.role === 'driver' ? 'success' : 
-                          'warning'
-                        }`}>
+                      <td style={{ padding: '16px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          textTransform: 'capitalize',
+                          background: user.role === 'admin' ? '#dbeafe' : 
+                                     user.role === 'driver' ? '#d1fae5' : '#fef3c7',
+                          color: user.role === 'admin' ? '#1e40af' : 
+                                 user.role === 'driver' ? '#065f46' : '#92400e'
+                        }}>
+                          {user.role === 'admin' ? '👑 ' : user.role === 'driver' ? '🚗 ' : '👤 '}
                           {user.role}
                         </span>
                       </td>
-                      <td>
-                        <span className={`badge badge-${user.is_active ? 'success' : 'danger'}`}>
-                          {user.is_active ? 'Active' : 'Inactive'}
+                      <td style={{ padding: '16px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          background: user.is_active ? '#d1fae5' : '#fee2e2',
+                          color: user.is_active ? '#065f46' : '#991b1b'
+                        }}>
+                          {user.is_active ? '✅ Active' : '⏸️ Inactive'}
                         </span>
                       </td>
-                      <td>
-                        <span className={`badge badge-${user.is_verified ? 'success' : 'warning'}`}>
-                          {user.is_verified ? 'Verified' : 'Pending'}
+                      <td style={{ padding: '16px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          background: user.is_verified ? '#d1fae5' : '#fef3c7',
+                          color: user.is_verified ? '#065f46' : '#92400e'
+                        }}>
+                          {user.is_verified ? '✓ Verified' : '⏳ Pending'}
                         </span>
                       </td>
-                      <td>{format(new Date(user.created_at), 'MMM dd, yyyy')}</td>
-                      <td>
-                        <div className="action-buttons">
+                      <td style={{ padding: '16px', color: '#64748b', fontSize: '14px' }}>
+                        {format(new Date(user.created_at), 'MMM dd, yyyy')}
+                      </td>
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                           <button 
-                            className={`btn-${user.is_active ? 'secondary' : 'success'} btn-sm`}
-                            onClick={() => toggleUserStatus(user.id, user.is_active)}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleEditUser(user);
+                            }}
+                            title="Edit User"
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              background: '#667eea',
+                              color: 'white',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#5568d3';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = '#667eea';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
                           >
-                            {user.is_active ? 'Deactivate' : 'Activate'}
+                            ✏️ Edit
                           </button>
                           <button 
-                            className="btn-primary btn-sm"
-                            onClick={() => setSelectedUser(user)}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSelectedUser(user);
+                            }}
+                            title="View Details"
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              background: 'white',
+                              color: '#475569',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#f1f5f9';
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'white';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                            }}
                           >
-                            Manage
+                            👁️ View
                           </button>
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleUserStatus(user.id, user.is_active);
+                            }}
+                            title={user.is_active ? 'Deactivate User' : 'Activate User'}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0',
+                              background: user.is_active ? '#f1f5f9' : '#d1fae5',
+                              color: user.is_active ? '#64748b' : '#065f46',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                          >
+                            {user.is_active ? '⏸️' : '▶️'}
+                          </button>
+                          {user.role !== 'admin' && (
+                            <button 
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('Delete button clicked, user:', user);
+                                handleDeleteClick(user);
+                              }}
+                              title="Delete User (Cannot be undone)"
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                background: '#fee2e2',
+                                color: '#991b1b',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#fecaca';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#fee2e2';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              🗑️ Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -551,6 +1157,94 @@ const UsersPage: React.FC = () => {
         </div>
       )}
 
+      {/* Edit User Modal */}
+      {showEditUser && editingUser && (
+        <div className="modal-overlay" onClick={() => { setShowEditUser(false); setEditingUser(null); }}>
+          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Edit User</h3>
+              <button className="modal-close" onClick={() => { setShowEditUser(false); setEditingUser(null); }}>×</button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={updateUser}>
+                <div className="form-group">
+                  <label>Full Name *</label>
+                  <input
+                    type="text"
+                    value={editingUser.full_name}
+                    onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Phone Number *</label>
+                  <input
+                    type="tel"
+                    value={editingUser.phone_number}
+                    onChange={(e) => setEditingUser({ ...editingUser, phone_number: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    value={editingUser.email || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Role *</label>
+                  <select
+                    value={editingUser.role}
+                    onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as any })}
+                    required
+                    disabled={editingUser.role === 'admin'}
+                  >
+                    <option value="passenger">Passenger</option>
+                    <option value="driver">Driver</option>
+                    {editingUser.role === 'admin' && <option value="admin">Admin</option>}
+                  </select>
+                  {editingUser.role === 'admin' && (
+                    <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>
+                      Admin role cannot be changed
+                    </small>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={editingUser.is_verified}
+                      onChange={(e) => setEditingUser({ ...editingUser, is_verified: e.target.checked })}
+                    />
+                    Verified
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={editingUser.is_active}
+                      onChange={(e) => setEditingUser({ ...editingUser, is_active: e.target.checked })}
+                    />
+                    Active
+                  </label>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn-secondary" onClick={() => { setShowEditUser(false); setEditingUser(null); }}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary">
+                    Update User
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create Role Modal */}
       {showRoles && (
         <div className="modal-overlay" onClick={() => setShowRoles(false)}>
@@ -616,6 +1310,60 @@ const UsersPage: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && userToDelete && (
+        <div className="modal-overlay" onClick={cancelDelete}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header" style={{ background: '#fee2e2', borderBottom: '2px solid #fecaca' }}>
+              <h3 style={{ color: '#991b1b', margin: 0 }}>⚠️ Delete User</h3>
+              <button className="modal-close" onClick={cancelDelete} style={{ color: '#991b1b' }}>×</button>
+            </div>
+            <div className="modal-body" style={{ padding: '24px' }}>
+              <p style={{ fontSize: '16px', marginBottom: '16px', color: '#1e293b' }}>
+                Are you sure you want to delete user <strong>"{userToDelete.name}"</strong>?
+              </p>
+              <p style={{ fontSize: '14px', color: '#ef4444', marginBottom: '24px', fontWeight: '600' }}>
+                ⚠️ This action cannot be undone. All user data will be permanently deleted.
+              </p>
+              <div className="modal-actions" style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button"
+                  className="btn-secondary" 
+                  onClick={cancelDelete}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    background: 'white',
+                    color: '#475569',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  className="btn-danger" 
+                  onClick={confirmDelete}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#ef4444',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  🗑️ Delete User
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -690,8 +1438,15 @@ const UsersPage: React.FC = () => {
               </div>
 
               <div className="modal-actions">
-                <button className="btn-secondary" onClick={() => setSelectedUser(null)}>
-                  Close
+                <button 
+                  className="btn-primary"
+                  onClick={() => {
+                    setEditingUser(selectedUser);
+                    setShowEditUser(true);
+                    setSelectedUser(null);
+                  }}
+                >
+                  ✏️ Edit User
                 </button>
                 <button 
                   className={`btn-${selectedUser.is_active ? 'secondary' : 'success'}`}
@@ -703,13 +1458,15 @@ const UsersPage: React.FC = () => {
                   {selectedUser.is_active ? 'Deactivate' : 'Activate'}
                 </button>
                 <button 
-                  className="btn-primary"
+                  className="btn-secondary"
                   onClick={() => {
                     resetPassword(selectedUser.id, selectedUser.phone_number);
-                    setSelectedUser(null);
                   }}
                 >
                   Reset Password
+                </button>
+                <button className="btn-secondary" onClick={() => setSelectedUser(null)}>
+                  Close
                 </button>
               </div>
             </div>

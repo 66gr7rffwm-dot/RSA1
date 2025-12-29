@@ -5,7 +5,10 @@ import {
   verifyAdmin,
   getUsers,
   createUser,
+  updateUser,
   updateUserStatus,
+  deleteUser,
+  getUserOTP,
   resetUserPassword,
   getKYCRequests,
   approveKYC,
@@ -36,6 +39,11 @@ import {
   assignUserRole,
   removeUserRole
 } from '../controllers/admin.controller';
+import {
+  getLogs,
+  getLogStats,
+  deleteLogs
+} from '../controllers/logs.controller';
 
 const router = express.Router();
 
@@ -55,11 +63,17 @@ router.get('/reports', getReports);
 // User Management
 router.get('/users', getUsers);
 router.post('/users', createUser);
-router.put('/users/:id/status', updateUserStatus);
+// OTP route must come before /users/:id to avoid route conflict
+router.get('/users/otp/:phoneNumber', getUserOTP);
+// Specific routes before generic :id routes
 router.post('/users/:id/reset-password', resetUserPassword);
 router.get('/users/:userId/roles', getUserRoles);
 router.post('/users/:userId/roles', assignUserRole);
 router.delete('/users/:userId/roles/:roleId', removeUserRole);
+// Generic :id routes (must come after specific routes)
+router.put('/users/:id', updateUser);
+router.put('/users/:id/status', updateUserStatus);
+router.delete('/users/:id', deleteUser);
 
 // KYC Management
 router.get('/kyc-requests', getKYCRequests);
@@ -94,5 +108,10 @@ router.put('/roles/:id', updateRole);
 router.delete('/roles/:id', deleteRole);
 router.get('/permissions', getPermissions);
 router.get('/roles/:roleId/permissions', getRolePermissions);
+
+// Logs Management
+router.get('/logs', getLogs);
+router.get('/logs/stats', getLogStats);
+router.delete('/logs', deleteLogs);
 
 export default router;

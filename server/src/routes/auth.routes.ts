@@ -73,5 +73,50 @@ router.post(
   resetPassword
 );
 
+// Get OTP (Development only - for testing)
+router.get('/get-otp/:phoneNumber', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ success: false, error: 'Not available in production' });
+  }
+
+  const { phoneNumber } = req.params;
+  const { pool } = require('../database/connection');
+
+  try {
+    const result = await pool.query(
+      `SELECT otp_code, created_at, expires_at, is_used 
+       FROM otp_verifications 
+       WHERE phone_number = $1 
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [phoneNumber]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No OTP found for this phone number',
+      });
+    }
+
+    const otp = result.rows[0];
+    res.json({
+      success: true,
+      data: {
+        otpCode: otp.otp_code,
+        createdAt: otp.created_at,
+        expiresAt: otp.expires_at,
+        isUsed: otp.is_used,
+        isValid: !otp.is_used && new Date() < new Date(otp.expires_at),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 export default router;
 

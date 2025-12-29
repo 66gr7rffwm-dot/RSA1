@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Use environment variable for API URL in production, or relative path in development
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+// Use environment variable for API URL, or default to deployed API
+const API_URL = import.meta.env.VITE_API_URL || 'https://carpooling-api-production-36c8.up.railway.app/api';
 
 // Log API URL in development to help debug
 if (import.meta.env.DEV) {

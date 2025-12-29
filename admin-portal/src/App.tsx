@@ -9,6 +9,7 @@ import PricingPage from './pages/PricingPage';
 import DisputesPage from './pages/DisputesPage';
 import ReportsPage from './pages/ReportsPage';
 import UsersPage from './pages/UsersPage';
+import LogsPage from './pages/LogsPage';
 import LoginPage from './pages/LoginPage';
 import api from './api';
 
@@ -176,6 +177,12 @@ const App: React.FC = () => {
               </svg>
               <span>Users</span>
             </NavLink>
+            <NavLink to="/logs" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <span>Logs</span>
+            </NavLink>
             <NavLink to="/kyc-requests" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <svg viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 2a1 1 0 00-1 1v1a1 1 0 002 0V3a1 1 0 00-1-1zM4 4h3a3 3 0 006 0h3a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm2.5 7a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm2.45 4a2.5 2.5 0 10-4.9 0h4.9zM12 9a1 1 0 100 2h3a1 1 0 100-2h-3zm-1 4a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1z" clipRule="evenodd" />
@@ -240,6 +247,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/logs" element={<LogsPage />} />
           <Route path="/kyc-requests" element={<KYCRequestsPage />} />
           <Route path="/vehicles" element={<VehiclesPage />} />
           <Route path="/routes" element={<RoutesPage />} />

@@ -18,6 +18,7 @@ import adminRoutes from './routes/admin.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializeSocket } from './services/socket/socketService';
 import { initializeNavigationService } from './services/navigation/navigationService';
+import { apiLogger, errorLogger, initializeLogTable } from './middleware/logger.middleware';
 
 dotenv.config();
 
@@ -52,6 +53,12 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Initialize logging
+initializeLogTable();
+
+// API logging middleware (before routes)
+app.use(apiLogger);
+
 // Static files for uploads
 app.use('/uploads', express.static('uploads'));
 
@@ -85,6 +92,9 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/sos', sosRoutes);
 app.use('/api/admin', adminRoutes);
+
+// Error logging middleware
+app.use(errorLogger);
 
 // Error handling middleware
 app.use(errorHandler);

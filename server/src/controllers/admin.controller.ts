@@ -87,6 +87,169 @@ export const getUsers = async (
   }
 };
 
+export const deleteUser = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Check if user exists
+    const userResult = await pool.query('SELECT id, role FROM users WHERE id = $1', [id]);
+    
+    if (userResult.rows.length === 0) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    const user = userResult.rows[0];
+
+    // Prevent deleting admin users
+    if (user.role === 'admin') {
+      res.status(403).json({ success: false, error: 'Cannot delete admin users' });
+      return;
+    }
+
+    // Delete user (cascade will handle related records)
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    next(new AppError('Failed to delete user', 500));
+  }
+};
+
+export const getUserOTP = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { phoneNumber } = req.params;
+
+    // Allow in development or if explicitly enabled
+    // For admin portal, we'll allow it (can be restricted later if needed)
+    // if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_OTP_VIEW) {
+    //   res.status(403).json({ success: false, error: 'Not available in production' });
+    //   return;
+    // }
+
+    const result = await pool.query(
+      `SELECT otp_code, created_at, expires_at, is_used 
+       FROM otp_verifications 
+       WHERE phone_number = $1 
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [phoneNumber]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, error: 'No OTP found for this phone number' });
+      return;
+    }
+
+    const otp = result.rows[0];
+    res.json({
+      success: true,
+      data: {
+        otpCode: otp.otp_code,
+        createdAt: otp.created_at,
+        expiresAt: otp.expires_at,
+        isUsed: otp.is_used,
+        isValid: !otp.is_used && new Date() < new Date(otp.expires_at),
+      },
+    });
+  } catch (error) {
+    next(new AppError('Failed to get OTP', 500));
+  }
+};
+
+export const updateUser = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { full_name, email, phone_number, role, is_active, is_verified } = req.body;
+
+    // Check if user exists
+    const userResult = await pool.query('SELECT id, role FROM users WHERE id = $1', [id]);
+    if (userResult.rows.length === 0) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    const existingUser = userResult.rows[0];
+
+    // Prevent changing admin role or deleting admin
+    if (existingUser.role === 'admin' && role && role !== 'admin') {
+      res.status(403).json({ success: false, error: 'Cannot change admin role' });
+      return;
+    }
+
+    // Build update query dynamically
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramCount = 1;
+
+    if (full_name !== undefined) {
+      updates.push(`full_name = $${paramCount++}`);
+      values.push(full_name);
+    }
+    if (email !== undefined) {
+      updates.push(`email = $${paramCount++}`);
+      values.push(email || null);
+    }
+    if (phone_number !== undefined) {
+      // Check if phone number is already taken by another user
+      const phoneCheck = await pool.query(
+        'SELECT id FROM users WHERE phone_number = $1 AND id != $2',
+        [phone_number, id]
+      );
+      if (phoneCheck.rows.length > 0) {
+        res.status(400).json({ success: false, error: 'Phone number already in use' });
+        return;
+      }
+      updates.push(`phone_number = $${paramCount++}`);
+      values.push(phone_number);
+    }
+    if (role !== undefined && existingUser.role !== 'admin') {
+      updates.push(`role = $${paramCount++}`);
+      values.push(role);
+    }
+    if (is_active !== undefined) {
+      updates.push(`is_active = $${paramCount++}`);
+      values.push(is_active);
+    }
+    if (is_verified !== undefined) {
+      updates.push(`is_verified = $${paramCount++}`);
+      values.push(is_verified);
+    }
+
+    if (updates.length === 0) {
+      res.status(400).json({ success: false, error: 'No fields to update' });
+      return;
+    }
+
+    values.push(id);
+    const query = `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount}`;
+    
+    await pool.query(query, values);
+
+    // Get updated user
+    const updatedUser = await pool.query(
+      'SELECT id, full_name, email, phone_number, role, is_verified, is_active, created_at FROM users WHERE id = $1',
+      [id]
+    );
+
+    res.json({ success: true, data: updatedUser.rows[0] });
+  } catch (error) {
+    next(new AppError('Failed to update user', 500));
+  }
+};
+
 export const updateUserStatus = async (
   req: AuthRequest,
   res: Response,

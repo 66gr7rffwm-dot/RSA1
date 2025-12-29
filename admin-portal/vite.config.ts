@@ -6,13 +6,8 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5001',
-        changeOrigin: true,
-        secure: false,
-      }
-    }
+    open: true, // Automatically open browser
+    // API calls go directly to deployed API (configured in src/api.ts)
   }
 });
 

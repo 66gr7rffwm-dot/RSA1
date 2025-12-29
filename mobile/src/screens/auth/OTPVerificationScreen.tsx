@@ -50,6 +50,12 @@ const OTPVerificationScreen = ({ route }: any) => {
         {phoneNumber}
       </Text>
 
+      <View style={styles.devHint}>
+        <Text style={styles.devHintText}>
+          💡 Development Mode: Use "000000" to bypass OTP verification
+        </Text>
+      </View>
+
       <TextInput
         style={styles.input}
         placeholder="Enter OTP"
@@ -128,6 +134,19 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#007AFF',
     fontSize: 14,
+  },
+  devHint: {
+    backgroundColor: '#FFF3CD',
+    borderColor: '#FFC107',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 20,
+  },
+  devHintText: {
+    color: '#856404',
+    fontSize: 13,
+    textAlign: 'center',
   },
 });
 

@@ -78,7 +78,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error.message === 'OTP_VERIFICATION_REQUIRED') {
         throw error;
       }
-      throw new Error(error.response?.data?.error || 'Login failed');
+      const errorMessage = error.userMessage || error.response?.data?.error || 'Login failed. Please check your credentials and try again.';
+      throw new Error(errorMessage);
     }
   };
 
@@ -88,7 +89,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Registration successful, OTP will be sent
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Registration failed');
+      const errorMessage = error.userMessage || error.response?.data?.error || 'Registration failed. Please check your information and try again.';
+      throw new Error(errorMessage);
     }
   };
 
@@ -101,7 +103,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await AsyncStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'OTP verification failed');
+      const errorMessage = error.userMessage || error.response?.data?.error || 'OTP verification failed. Please check the code and try again.';
+      throw new Error(errorMessage);
     }
   };
 

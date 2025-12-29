@@ -1,10 +1,12 @@
 #!/bin/bash
 
-# iOS Build Script for Carpooling App
-# This script will build the iOS app for installation on your device
+# iOS Build Script
+# Builds iOS app using EAS Build
 
-echo "🚀 Starting iOS Build Process..."
+echo "🍎 Building iOS App..."
 echo ""
+
+cd "$(dirname "$0")"
 
 # Check if EAS CLI is installed
 if ! command -v eas &> /dev/null; then
@@ -13,34 +15,30 @@ if ! command -v eas &> /dev/null; then
 fi
 
 # Check if logged in
-echo "📋 Checking EAS login status..."
 if ! eas whoami &> /dev/null; then
     echo "🔐 Please login to Expo:"
     eas login
 fi
 
-# Navigate to mobile directory
-cd "$(dirname "$0")"
-
-echo ""
-echo "📦 Building iOS app..."
-echo "This will take 10-20 minutes..."
+echo "🚀 Starting iOS build..."
+echo "⏳ This will take 15-20 minutes..."
 echo ""
 
-# Build for iOS preview
-eas build --platform ios --profile preview --non-interactive
+# Build iOS app
+eas build --platform ios --profile preview
 
-echo ""
-echo "✅ Build started!"
-echo ""
-echo "📱 Next Steps:"
-echo "1. Wait for build to complete (check email or EAS dashboard)"
-echo "2. Download the .ipa file when ready"
-echo "3. Install on your iPhone using one of these methods:"
-echo "   - TestFlight (recommended)"
-echo "   - Xcode Devices window"
-echo "   - AltStore or similar tool"
-echo ""
-echo "🌐 Make sure your backend is running on: http://11.11.10.194:5001"
-echo ""
-
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "✅ Build completed!"
+    echo ""
+    echo "📥 Next steps:"
+    echo "   1. Check build status: eas build:list --platform ios"
+    echo "   2. Download IPA from Expo dashboard"
+    echo "   3. Install via TestFlight or Xcode"
+    echo ""
+    echo "🌐 Dashboard: https://expo.dev/accounts/amjad4093/projects/carpooling-app/builds"
+else
+    echo ""
+    echo "❌ Build failed. Check errors above."
+    exit 1
+fi
