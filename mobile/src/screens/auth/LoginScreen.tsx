@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
   Platform,
   ScrollView,
   Dimensions,
-  Animated,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
@@ -28,6 +29,7 @@ const LoginScreen = () => {
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const { login } = useAuth();
   const navigation = useNavigation();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const handleLogin = async () => {
     if (!phoneNumber || !password) {
@@ -35,6 +37,7 @@ const LoginScreen = () => {
       return;
     }
 
+    Keyboard.dismiss();
     setLoading(true);
     try {
       await login(phoneNumber, password);
@@ -49,18 +52,34 @@ const LoginScreen = () => {
     }
   };
 
+  const handleInputFocus = (field: string) => {
+    setFocusedInput(field);
+    // Scroll to make input visible
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-      <LinearGradient
-        colors={gradients.primary}
-        style={styles.gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.content}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <LinearGradient
+          colors={gradients.primary}
+          style={styles.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <ScrollView
+            ref={scrollViewRef}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
+          >
           {/* Modern Header with Logo */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
@@ -102,7 +121,7 @@ const LoginScreen = () => {
                   keyboardType="phone-pad"
                   autoCapitalize="none"
                   autoComplete="tel"
-                  onFocus={() => setFocusedInput('phone')}
+                  onFocus={() => handleInputFocus('phone')}
                   onBlur={() => setFocusedInput(null)}
                 />
               </View>
@@ -126,7 +145,7 @@ const LoginScreen = () => {
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoComplete="password"
-                  onFocus={() => setFocusedInput('password')}
+                  onFocus={() => handleInputFocus('password')}
                   onBlur={() => setFocusedInput(null)}
                 />
                 <TouchableOpacity
@@ -183,8 +202,9 @@ const LoginScreen = () => {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </LinearGradient>
+          </ScrollView>
+        </LinearGradient>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 };
@@ -197,16 +217,16 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingBottom: spacing.xxl,
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: Platform.OS === 'ios' ? spacing.xl : spacing.lg,
   },
   header: {
-    paddingTop: height * 0.08,
+    paddingTop: Platform.OS === 'ios' ? height * 0.08 : height * 0.05,
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   logoContainer: {
     marginBottom: spacing.lg,
@@ -244,8 +264,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: borderRadius.xl * 2,
     padding: spacing.xl,
     paddingTop: spacing.xl * 1.5,
-    marginTop: 'auto',
-    minHeight: height * 0.6,
+    paddingBottom: spacing.xxl,
     ...shadows.xl,
   },
   formHeader: {

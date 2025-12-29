@@ -198,7 +198,7 @@ const SearchRidesScreen = () => {
       Animated.timing(filterAnim, {
         toValue: showFilters ? 1 : 0,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: false, // Must be false for maxHeight animation
       }).start();
     } catch (err) {
       console.error('Filter animation error:', err);
