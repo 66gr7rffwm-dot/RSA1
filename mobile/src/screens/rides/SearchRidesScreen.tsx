@@ -162,24 +162,29 @@ const SearchRidesScreen = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [womenOnly, setWomenOnly] = useState(false);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const filterAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    try {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } catch (err) {
+      console.error('Animation error:', err);
+    }
   }, []);
 
   useEffect(() => {
@@ -189,11 +194,15 @@ const SearchRidesScreen = () => {
   }, []);
 
   useEffect(() => {
-    Animated.timing(filterAnim, {
-      toValue: showFilters ? 1 : 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    try {
+      Animated.timing(filterAnim, {
+        toValue: showFilters ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } catch (err) {
+      console.error('Filter animation error:', err);
+    }
   }, [showFilters]);
 
   const search = async () => {
@@ -201,6 +210,7 @@ const SearchRidesScreen = () => {
       return;
     }
     setLoading(true);
+    setError(null);
     try {
       const params: any = { tripDate: date };
       if (origin) params.origin = origin;
@@ -209,9 +219,23 @@ const SearchRidesScreen = () => {
 
       const res = await api.get('/trips/search', { params });
       setTrips(res.data.data || []);
-    } catch (error: any) {
-      console.error('Search error:', error);
+    } catch (err: any) {
+      console.error('Search error:', err);
+      setError(err.message || 'Failed to search rides. Please try again.');
       setTrips([]);
+      // Report error to backend
+      try {
+        await api.post('/logs/crash', {
+          type: 'api_error',
+          message: err.message || 'Search rides failed',
+          stack: err.stack,
+          platform: 'mobile',
+          appVersion: '1.0.2',
+          screenName: 'SearchRidesScreen',
+        });
+      } catch (reportErr) {
+        // Silently fail
+      }
     } finally {
       setLoading(false);
     }

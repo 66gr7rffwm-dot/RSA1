@@ -3,10 +3,166 @@
  * Handles retrieval of API and application logs
  */
 
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { AppError } from '../middleware/errorHandler';
 import { pool } from '../database/connection';
+
+// Public endpoint - log crashes from mobile app
+export const logCrash = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const {
+      type,
+      message,
+      stack,
+      componentStack,
+      timestamp,
+      platform,
+      appVersion,
+      buildNumber,
+      deviceInfo,
+      userId,
+      screenName,
+    } = req.body;
+
+    // Ensure crash_logs table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS crash_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        type VARCHAR(50) NOT NULL DEFAULT 'app_crash',
+        message TEXT NOT NULL,
+        stack TEXT,
+        component_stack TEXT,
+        platform VARCHAR(20),
+        app_version VARCHAR(20),
+        build_number INTEGER,
+        device_info JSONB,
+        user_id UUID,
+        screen_name VARCHAR(100),
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Insert crash log
+    await pool.query(
+      `INSERT INTO crash_logs (
+        type, message, stack, component_stack, platform,
+        app_version, build_number, device_info, user_id,
+        screen_name, ip_address, user_agent
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        type || 'app_crash',
+        message || 'Unknown error',
+        stack,
+        componentStack,
+        platform || 'unknown',
+        appVersion,
+        buildNumber,
+        JSON.stringify(deviceInfo || {}),
+        userId,
+        screenName,
+        req.ip,
+        req.headers['user-agent'],
+      ]
+    );
+
+    console.log(`🚨 CRASH REPORTED: ${message} (${platform} v${appVersion})`);
+
+    res.json({
+      success: true,
+      message: 'Crash report received',
+    });
+  } catch (error) {
+    console.error('Failed to log crash:', error);
+    // Don't fail the request - just acknowledge it
+    res.json({
+      success: true,
+      message: 'Crash report acknowledged',
+    });
+  }
+};
+
+// Get crash logs (admin only)
+export const getCrashLogs = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const {
+      page = '1',
+      limit = '50',
+      platform,
+      appVersion,
+      startDate,
+      endDate,
+    } = req.query;
+
+    const pageNum = parseInt(page as string, 10);
+    const limitNum = parseInt(limit as string, 10);
+    const offset = (pageNum - 1) * limitNum;
+
+    let query = 'SELECT * FROM crash_logs WHERE 1=1';
+    const params: any[] = [];
+    let paramCount = 0;
+
+    if (platform) {
+      paramCount++;
+      query += ` AND platform = $${paramCount}`;
+      params.push(platform);
+    }
+
+    if (appVersion) {
+      paramCount++;
+      query += ` AND app_version = $${paramCount}`;
+      params.push(appVersion);
+    }
+
+    if (startDate) {
+      paramCount++;
+      query += ` AND created_at >= $${paramCount}`;
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      paramCount++;
+      query += ` AND created_at <= $${paramCount}`;
+      params.push(endDate);
+    }
+
+    // Get total count
+    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    // Add ordering and pagination
+    query += ' ORDER BY created_at DESC LIMIT $' + (paramCount + 1) + ' OFFSET $' + (paramCount + 2);
+    params.push(limitNum, offset);
+
+    const result = await pool.query(query, params);
+
+    res.json({
+      success: true,
+      data: {
+        crashes: result.rows,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      },
+    });
+  } catch (error) {
+    next(new AppError('Failed to fetch crash logs', 500));
+  }
+};
 
 export const getLogs = async (
   req: AuthRequest,

@@ -15,6 +15,7 @@ import paymentRoutes from './routes/payment.routes';
 import ratingRoutes from './routes/rating.routes';
 import sosRoutes from './routes/sos.routes';
 import adminRoutes from './routes/admin.routes';
+import logsRoutes from './routes/logs.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { initializeSocket } from './services/socket/socketService';
 import { initializeNavigationService } from './services/navigation/navigationService';
@@ -92,6 +93,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/sos', sosRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/logs', logsRoutes);
 
 // Error logging middleware
 app.use(errorLogger);
