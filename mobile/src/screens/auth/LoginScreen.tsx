@@ -60,11 +60,7 @@ const LoginScreen = () => {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+        <View style={styles.content}>
           {/* Modern Header with Logo */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
@@ -187,7 +183,7 @@ const LoginScreen = () => {
               </Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
+        </View>
       </LinearGradient>
     </KeyboardAvoidingView>
   );
@@ -201,8 +197,9 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
+  content: {
+    flex: 1,
+    justifyContent: 'center',
     paddingBottom: spacing.xxl,
   },
   header: {

@@ -82,9 +82,6 @@ android {
     compileSdkVersion rootProject.ext.compileSdkVersion
 
     namespace 'com.carpooling.app'
-    buildFeatures {
-        buildConfig true
-    }
     defaultConfig {
         applicationId 'com.carpooling.app'
         minSdkVersion rootProject.ext.minSdkVersion

@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#00A859"
+      "backgroundColor": "#6366F1"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -25,7 +25,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#00A859"
+        "backgroundColor": "#6366F1"
       },
       "package": "com.carpooling.app",
       "versionCode": 2,

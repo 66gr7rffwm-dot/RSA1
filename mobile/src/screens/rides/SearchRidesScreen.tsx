@@ -253,6 +253,37 @@ const SearchRidesScreen = () => {
             },
           ]}
         >
+          {/* Quick Date Selection */}
+          <View style={styles.quickDateContainer}>
+            <TouchableOpacity
+              style={[styles.quickDateButton, date === getTodayDate() && styles.quickDateButtonActive]}
+              onPress={() => {
+                setDate(getTodayDate());
+                setTimeout(() => search(), 100);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.quickDateText, date === getTodayDate() && styles.quickDateTextActive]}>Today</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.quickDateButton, date === getTomorrowDate() && styles.quickDateButtonActive]}
+              onPress={() => {
+                setDate(getTomorrowDate());
+                setTimeout(() => search(), 100);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.quickDateText, date === getTomorrowDate() && styles.quickDateTextActive]}>Tomorrow</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickDateButton}
+              onPress={() => setShowFilters(!showFilters)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.quickDateText}>📅 Custom</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.searchBar}>
             <View
               style={[
@@ -268,7 +299,10 @@ const SearchRidesScreen = () => {
                 onChangeText={setDate}
                 placeholderTextColor={colors.textTertiary}
                 onFocus={() => setFocusedInput('date')}
-                onBlur={() => setFocusedInput(null)}
+                onBlur={() => {
+                  setFocusedInput(null);
+                  if (date) search();
+                }}
               />
             </View>
             <TouchableOpacity
@@ -403,6 +437,12 @@ const getTodayDate = () => {
   return today.toISOString().split('T')[0];
 };
 
+const getTomorrowDate = () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().split('T')[0];
+};
+
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', { 
@@ -498,6 +538,34 @@ const styles = StyleSheet.create({
   },
   searchButtonText: {
     fontSize: 24,
+  },
+  quickDateContainer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  quickDateButton: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceVariant,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickDateButtonActive: {
+    backgroundColor: colors.primaryContainer,
+    borderColor: colors.primary,
+  },
+  quickDateText: {
+    ...typography.smallMedium,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  quickDateTextActive: {
+    color: colors.primary,
+    fontWeight: '700',
   },
   filterButton: {
     paddingVertical: spacing.sm,

@@ -1,14 +1,14 @@
-// Material Design 3 + Careem-Inspired Color Palette
-// Based on M3 design system with Careem's vibrant green theme
+// Material Design 3 + Modern Color Palette
+// Based on M3 design system with modern blue/purple gradient theme
 
 export const colors = {
-  // Primary Brand Colors (Careem Green - M3 Primary)
-  primary: '#00A859', // Careem signature green
-  primaryDark: '#007A42', // Darker shade for depth
-  primaryLight: '#00C96A', // Lighter shade for highlights
-  primaryContainer: '#C8F5DC', // M3 container color
+  // Primary Brand Colors (Modern Blue/Purple - M3 Primary)
+  primary: '#6366F1', // Modern indigo blue
+  primaryDark: '#4F46E5', // Darker shade for depth
+  primaryLight: '#818CF8', // Lighter shade for highlights
+  primaryContainer: '#E0E7FF', // M3 container color
   onPrimary: '#FFFFFF', // Text on primary
-  onPrimaryContainer: '#002114', // Text on primary container
+  onPrimaryContainer: '#1E1B4B', // Text on primary container
   
   // Secondary Colors (M3 Secondary)
   secondary: '#FF6B35', // Vibrant orange accent
@@ -88,17 +88,17 @@ export const colors = {
   shadowDark: 'rgba(0, 0, 0, 0.2)',
   shadowLight: 'rgba(0, 0, 0, 0.05)',
   
-  // Careem-Specific Accents
-  accent: '#00A859', // Primary accent
-  accentSecondary: '#FF6B35', // Secondary accent
-  highlight: '#00C96A', // Highlight color
+  // Modern Accents
+  accent: '#6366F1', // Primary accent (indigo)
+  accentSecondary: '#8B5CF6', // Secondary accent (purple)
+  highlight: '#818CF8', // Highlight color
 };
 
-// Material Design 3 Gradients (Careem-inspired)
+// Material Design 3 Gradients (Modern Blue/Purple)
 export const gradients = {
-  primary: ['#00A859', '#00C96A'], // Careem green gradient
-  primaryDark: ['#007A42', '#00A859'], // Darker green gradient
-  secondary: ['#FF6B35', '#FF8C5A'], // Orange gradient
+  primary: ['#6366F1', '#8B5CF6'], // Modern indigo to purple gradient
+  primaryDark: ['#4F46E5', '#6366F1'], // Darker indigo gradient
+  secondary: ['#EC4899', '#F472B6'], // Pink gradient
   surface: ['#FFFFFF', '#F9FAFB'], // Surface gradient
   dark: ['#1F2937', '#111827'], // Dark gradient
   success: ['#10B981', '#34D399'], // Success gradient

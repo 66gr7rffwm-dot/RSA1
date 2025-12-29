@@ -123,7 +123,8 @@ const HomeScreen = () => {
             if (isDriver) {
               navigation.navigate('Search' as never, { screen: 'CreateTrip' } as never);
             } else {
-              navigation.navigate('Search' as never);
+              // Navigate to SearchRides screen directly
+              navigation.navigate('Search' as never, { screen: 'SearchRides' } as never);
             }
           }}
           activeOpacity={0.8}
