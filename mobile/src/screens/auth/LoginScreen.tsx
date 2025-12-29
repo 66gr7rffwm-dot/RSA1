@@ -11,11 +11,12 @@ import {
   Platform,
   ScrollView,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
-import { colors, typography, spacing, borderRadius, shadows } from '../../theme';
+import { colors, typography, spacing, borderRadius, shadows, gradients } from '../../theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,6 +25,7 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const { login } = useAuth();
   const navigation = useNavigation();
 
@@ -53,41 +55,72 @@ const LoginScreen = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={[colors.primary, colors.primaryDark]}
+        colors={gradients.primary}
         style={styles.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* Header Section */}
+          {/* Modern Header with Logo */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Text style={styles.logoIcon}>🚗</Text>
+              <LinearGradient
+                colors={[colors.white, colors.gray100]}
+                style={styles.logoGradient}
+              >
+                <Text style={styles.logoIcon}>🚗</Text>
+              </LinearGradient>
             </View>
-            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.title}>Welcome Back!</Text>
             <Text style={styles.subtitle}>Sign in to continue your journey</Text>
           </View>
 
-          {/* Form Section */}
+          {/* Modern Form Card */}
           <View style={styles.formContainer}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Phone Number</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="+92 300 1234567"
-                placeholderTextColor={colors.textTertiary}
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                keyboardType="phone-pad"
-                autoCapitalize="none"
-                autoComplete="tel"
-              />
+            <View style={styles.formHeader}>
+              <Text style={styles.formTitle}>Sign In</Text>
+              <Text style={styles.formSubtitle}>Enter your credentials to continue</Text>
             </View>
 
-            <View style={styles.inputContainer}>
+            {/* Phone Number Input - Material Design 3 Style */}
+            <View style={styles.inputWrapper}>
+              <Text style={styles.label}>Phone Number</Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  focusedInput === 'phone' && styles.inputContainerFocused,
+                ]}
+              >
+                <Text style={styles.inputPrefix}>+92</Text>
+                <View style={styles.inputDivider} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="300 1234567"
+                  placeholderTextColor={colors.textTertiary}
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  keyboardType="phone-pad"
+                  autoCapitalize="none"
+                  autoComplete="tel"
+                  onFocus={() => setFocusedInput('phone')}
+                  onBlur={() => setFocusedInput(null)}
+                />
+              </View>
+            </View>
+
+            {/* Password Input - Material Design 3 Style */}
+            <View style={styles.inputWrapper}>
               <Text style={styles.label}>Password</Text>
-              <View style={styles.passwordContainer}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  focusedInput === 'password' && styles.inputContainerFocused,
+                ]}
+              >
                 <TextInput
                   style={styles.passwordInput}
                   placeholder="Enter your password"
@@ -97,16 +130,25 @@ const LoginScreen = () => {
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoComplete="password"
+                  onFocus={() => setFocusedInput('password')}
+                  onBlur={() => setFocusedInput(null)}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.eyeIcon}
+                  activeOpacity={0.7}
                 >
                   <Text style={styles.eyeIconText}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
+            {/* Forgot Password Link */}
+            <TouchableOpacity style={styles.forgotPassword}>
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            {/* Sign In Button - Careem Style */}
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleLogin}
@@ -114,25 +156,34 @@ const LoginScreen = () => {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={[colors.primary, colors.primaryLight]}
+                colors={gradients.primary}
                 style={styles.buttonGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={colors.white} size="small" />
                 ) : (
                   <Text style={styles.buttonText}>Sign In</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
 
+            {/* Divider */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Sign Up Link */}
             <TouchableOpacity
               onPress={() => navigation.navigate('Register' as never)}
-              style={styles.linkButton}
+              style={styles.signUpButton}
+              activeOpacity={0.7}
             >
-              <Text style={styles.linkText}>
-                Don't have an account? <Text style={styles.linkTextBold}>Sign Up</Text>
+              <Text style={styles.signUpText}>
+                Don't have an account? <Text style={styles.signUpTextBold}>Sign Up</Text>
               </Text>
             </TouchableOpacity>
           </View>
@@ -145,44 +196,50 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   gradient: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
   header: {
-    paddingTop: height * 0.1,
+    paddingTop: height * 0.08,
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
-    marginBottom: spacing.xl * 2,
+    marginBottom: spacing.xl,
   },
   logoContainer: {
-    width: 100,
-    height: 100,
+    marginBottom: spacing.lg,
+  },
+  logoGradient: {
+    width: 120,
+    height: 120,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.lg,
-    ...shadows.lg,
+    ...shadows.xl,
   },
   logoIcon: {
-    fontSize: 50,
+    fontSize: 60,
   },
   title: {
     ...typography.h1,
+    fontSize: 36,
     color: colors.white,
     marginBottom: spacing.sm,
-    fontWeight: '700',
+    fontWeight: '800',
+    textAlign: 'center',
   },
   subtitle: {
     ...typography.body,
+    fontSize: 16,
     color: colors.white,
-    opacity: 0.9,
+    opacity: 0.95,
     textAlign: 'center',
+    fontWeight: '400',
   },
   formContainer: {
     backgroundColor: colors.white,
@@ -190,9 +247,24 @@ const styles = StyleSheet.create({
     borderTopRightRadius: borderRadius.xl * 2,
     padding: spacing.xl,
     paddingTop: spacing.xl * 1.5,
-    ...shadows.lg,
+    marginTop: 'auto',
+    minHeight: height * 0.6,
+    ...shadows.xl,
   },
-  inputContainer: {
+  formHeader: {
+    marginBottom: spacing.xl,
+  },
+  formTitle: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+    fontWeight: '700',
+  },
+  formSubtitle: {
+    ...typography.small,
+    color: colors.textSecondary,
+  },
+  inputWrapper: {
     marginBottom: spacing.lg,
   },
   label: {
@@ -200,68 +272,116 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: spacing.sm,
     fontWeight: '600',
+    fontSize: 14,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    minHeight: 56,
+    ...shadows.sm,
+  },
+  inputContainerFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryContainer,
+    ...shadows.md,
+  },
+  inputPrefix: {
+    ...typography.bodyMedium,
+    color: colors.textSecondary,
+    marginRight: spacing.sm,
+    fontWeight: '600',
+  },
+  inputDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: colors.border,
+    marginRight: spacing.sm,
   },
   input: {
     ...typography.body,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    backgroundColor: colors.gray50,
+    flex: 1,
     color: colors.textPrimary,
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.gray50,
+    paddingVertical: spacing.md,
+    fontSize: 16,
   },
   passwordInput: {
     ...typography.body,
     flex: 1,
-    padding: spacing.lg,
     color: colors.textPrimary,
+    paddingVertical: spacing.md,
+    fontSize: 16,
   },
   eyeIcon: {
-    padding: spacing.md,
+    padding: spacing.sm,
+    marginLeft: spacing.xs,
   },
   eyeIconText: {
-    fontSize: 20,
+    fontSize: 22,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: spacing.lg,
+  },
+  forgotPasswordText: {
+    ...typography.smallMedium,
+    color: colors.primary,
+    fontWeight: '600',
   },
   button: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
-    marginTop: spacing.md,
-    ...shadows.md,
+    marginBottom: spacing.md,
+    ...shadows.lg,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonGradient: {
-    padding: spacing.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 56,
   },
   buttonText: {
     ...typography.button,
     color: colors.white,
     fontWeight: '700',
+    fontSize: 18,
   },
-  linkButton: {
-    marginTop: spacing.lg,
+  divider: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginVertical: spacing.lg,
   },
-  linkText: {
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    ...typography.captionMedium,
+    color: colors.textTertiary,
+    marginHorizontal: spacing.md,
+    fontWeight: '600',
+  },
+  signUpButton: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  signUpText: {
     ...typography.body,
     color: colors.textSecondary,
   },
-  linkTextBold: {
+  signUpTextBold: {
     color: colors.primary,
     fontWeight: '700',
   },
 });
 
 export default LoginScreen;
-

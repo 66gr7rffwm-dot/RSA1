@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
-import { colors, typography, spacing, borderRadius, shadows } from '../../theme';
+import { colors, typography, spacing, borderRadius, shadows, gradients } from '../../theme';
 import api from '../../config/api';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -53,7 +53,7 @@ const HomeScreen = () => {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Modern Header with Gradient */}
       <LinearGradient
-        colors={[colors.primary, colors.primaryDark]}
+        colors={gradients.primary}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
@@ -129,7 +129,7 @@ const HomeScreen = () => {
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={[colors.primary, colors.primaryLight]}
+            colors={gradients.primary}
             style={styles.mainActionGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
