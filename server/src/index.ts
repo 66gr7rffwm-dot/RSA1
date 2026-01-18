@@ -30,9 +30,16 @@ if (process.env.GOOGLE_MAPS_API_KEY) {
 
 const app = express();
 const httpServer = createServer(app);
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:3000',
+  process.env.ADMIN_URL || 'http://localhost:5173',
+  'http://localhost:3001',
+  'https://rsa-iota-navy.vercel.app'
+].filter(Boolean);
+
 const io = new Server(httpServer, {
   cors: {
-    origin: [process.env.FRONTEND_URL || 'http://localhost:3000', process.env.ADMIN_URL || 'http://localhost:3001'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST']
   }
 });
@@ -40,11 +47,9 @@ const io = new Server(httpServer, {
 const PORT = process.env.PORT || 5001;
 
 // Middleware
-// CORS configuration - allow all origins in production, specific in development
+// CORS configuration - include deployed admin origin plus env-configured URLs
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? true // Allow all origins in production (or specify: [process.env.FRONTEND_URL, process.env.ADMIN_URL])
-    : [process.env.FRONTEND_URL || 'http://localhost:3000', process.env.ADMIN_URL || 'http://localhost:5173'],
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
